@@ -62,18 +62,28 @@ class Database:
         cur = self.conn.execute("SELECT id FROM listings WHERE id=?", (listing_id,))
         exists = cur.fetchone() is not None
         if exists:
+            # Backfill card-level fields when still empty (e.g. rows created
+            # before card parsing was enriched).
             self.conn.execute(
-                "UPDATE listings SET last_seen_at=?, url=COALESCE(url,?) WHERE id=?",
-                (now, url, listing_id),
+                "UPDATE listings SET last_seen_at=?, url=COALESCE(url,?), "
+                "rooms=COALESCE(rooms,?), area_total=COALESCE(area_total,?), "
+                "floor=COALESCE(floor,?), floors_total=COALESCE(floors_total,?), "
+                "price_kzt=COALESCE(price_kzt,?), address=COALESCE(address,?), "
+                "description=COALESCE(description,?) WHERE id=?",
+                (now, url, card.get("rooms"), card.get("area_total"),
+                 card.get("floor"), card.get("floors_total"), card.get("price_kzt"),
+                 card.get("address"), card.get("description"), listing_id),
             )
         else:
             self.conn.execute(
                 "INSERT INTO listings (id, url, deal_type, rent_period, city, "
-                "rooms, area_total, price_kzt, address, first_seen_at, last_seen_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                "rooms, area_total, floor, floors_total, price_kzt, address, "
+                "description, first_seen_at, last_seen_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (listing_id, url, "rent", "month", city,
-                 card.get("rooms"), card.get("area_total"), card.get("price_kzt"),
-                 card.get("address"), now, now),
+                 card.get("rooms"), card.get("area_total"), card.get("floor"),
+                 card.get("floors_total"), card.get("price_kzt"),
+                 card.get("address"), card.get("description"), now, now),
             )
         self.conn.commit()
         return not exists

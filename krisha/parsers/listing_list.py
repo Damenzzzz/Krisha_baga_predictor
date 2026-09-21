@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 
 from .. import config
 from . import dom, normalize as N
-from .selectors import CARD, CARD_DESCR, CARD_PRICE, CARD_SUBTITLE, CARD_TITLE
+from .selectors import (CARD, CARD_DESCR, CARD_PRICE, CARD_SUBTITLE, CARD_TITLE)
 from .window_data import extract_window_data
 
 _SHOW_RE = re.compile(r"/a/show/(\d+)")
@@ -25,7 +25,10 @@ class Card:
     price_kzt: int | None = None
     rooms: int | None = None
     area_total: float | None = None
+    floor: int | None = None
+    floors_total: int | None = None
     address: str | None = None
+    description: str | None = None
     photos: list[str] = field(default_factory=list)
 
 
@@ -64,7 +67,9 @@ def parse_list(html: str) -> ListPage:
         title = title_node.text() if title_node else None
         price_node = card.css_first(CARD_PRICE)
         sub_node = card.css_first(CARD_SUBTITLE)
+        descr_node = card.css_first(CARD_DESCR)
         areas = N.parse_areas(title)
+        floor, floors_total = N.parse_floor(title)
         photos: list[str] = []
         for node in card.css("[data-full-src]"):
             src = node.attr("data-full-src")
@@ -76,7 +81,10 @@ def parse_list(html: str) -> ListPage:
             price_kzt=N.to_int(price_node.text()) if price_node else None,
             rooms=N.parse_rooms(title),
             area_total=areas["area_total"],
+            floor=floor,
+            floors_total=floors_total,
             address=N.clean(sub_node.text()) if sub_node else None,
+            description=N.clean(descr_node.text()) if descr_node else None,
             photos=photos,
         )
 

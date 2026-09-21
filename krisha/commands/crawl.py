@@ -45,7 +45,9 @@ def run(db: Database, ctrl: Controller, city: str, max_pages: int | None = None)
             card_data = None
             if card:
                 card_data = {"rooms": card.rooms, "area_total": card.area_total,
-                             "price_kzt": card.price_kzt, "address": card.address}
+                             "floor": card.floor, "floors_total": card.floors_total,
+                             "price_kzt": card.price_kzt, "address": card.address,
+                             "description": card.description}
             is_new = db.upsert_stub(cid, config.detail_url(cid), city, card_data)
             if card and card.photos:
                 db.add_card_photos(cid, card.photos)
