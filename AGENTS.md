@@ -134,12 +134,15 @@ Typical flow: `crawl` → `details` → `photos` → `dedup` → (`embed`) → `
   This yields a usable dataset without detail pages. Fields only on the detail
   page (area_kitchen/living, year_built, building_type, lat/lon, full gallery,
   full description) stay NULL until `details` succeeds.
-- **Current data (2026-09-22)**: Kaskelen + Almaty crawled — **7208 listings**
-  (266 Kaskelen + 6941 Almaty), **6926 with a downloaded photo** (~6.9k photo
-  files), deduped to **6793 groups** (301 near-duplicate clusters); `export --csv`
-  emits **6793 rows** of card-level data (price, rooms, area_total, floor, address,
-  1–2 photos). Detail enrichment (`detail_fetched_at`) still pending — `/a/show/`
-  is IP-blocked (468) from this network.
+- **Current data (2026-09-22)**: Kaskelen + Almaty crawled — **7485 listings**,
+  **7199 with photos**. Full albums recovered via CDN index-walk (`photos --expand`):
+  **67,850 photos, all downloaded** (0 pending), avg **9.4 photos/listing** (max 40),
+  ~66.8k files on disk. Deduped to **7287 groups**; `export --csv` emits **7287 rows**.
+  Card-level fields present for ~all rows (price, rooms, area_total, floor,
+  floors_total, address, description snippet). Detail-only fields
+  (area_kitchen/living, year_built, building_type, lat/lon, full description,
+  amenities) remain NULL — `/a/show/` is IP-blocked (468) from this network;
+  `detail_fetched_at` count = 1 (fixture).
 - `crawl`, `photos`, `dedup`, `stats`, `export` and all parsing are validated;
   parsers are covered by pytest (12 tests) against real saved fixtures.
 - Complex name (`complex_name`) is only populated when present in the params.
