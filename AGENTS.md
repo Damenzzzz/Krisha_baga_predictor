@@ -134,9 +134,12 @@ Typical flow: `crawl` → `details` → `photos` → `dedup` → (`embed`) → `
   This yields a usable dataset without detail pages. Fields only on the detail
   page (area_kitchen/living, year_built, building_type, lat/lon, full gallery,
   full description) stay NULL until `details` succeeds.
-- **Current data (2026-09-22)**: Kaskelen fully crawled — 266 listings, 247 with
-  a photo downloaded, deduped to 247 groups; `export --csv` emits 247 rows. Detail
-  enrichment pending (IP blocked). Add `--city almaty` for far more volume.
+- **Current data (2026-09-22)**: Kaskelen + Almaty crawled — **7208 listings**
+  (266 Kaskelen + 6941 Almaty), **6926 with a downloaded photo** (~6.9k photo
+  files), deduped to **6793 groups** (301 near-duplicate clusters); `export --csv`
+  emits **6793 rows** of card-level data (price, rooms, area_total, floor, address,
+  1–2 photos). Detail enrichment (`detail_fetched_at`) still pending — `/a/show/`
+  is IP-blocked (468) from this network.
 - `crawl`, `photos`, `dedup`, `stats`, `export` and all parsing are validated;
   parsers are covered by pytest (12 tests) against real saved fixtures.
 - Complex name (`complex_name`) is only populated when present in the params.
