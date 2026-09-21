@@ -1,0 +1,18 @@
+# --- Core parser (Phase A) ---
+httpx>=0.27
+selectolax>=0.3.21
+beautifulsoup4>=4.12
+lxml>=5.0
+playwright>=1.44
+python-dotenv>=1.0
+tqdm>=4.66
+
+# --- Tests ---
+pytest>=8.0
+
+# --- Embeddings worker (Phase B) ---
+# Heavy deps; only needed for `python -m krisha embed`.
+open-clip-torch>=2.24
+torch>=2.2
+pillow>=10.0
+qdrant-client>=1.9
