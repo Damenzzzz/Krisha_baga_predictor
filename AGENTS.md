@@ -126,9 +126,19 @@ Typical flow: `crawl` → `details` → `photos` → `dedup` → (`embed`) → `
 - **Detail fetching is IP-reputation limited.** krisha serves 468 on `/a/show/`
   once an IP is flagged; the Playwright engine bypasses it when the IP is clean
   but not when greylisted. Run `details` slowly and patiently; if it stops with
-  `BlockedStop`, wait (minutes–hours) and resume — it is idempotent.
+  `BlockedStop`, wait (minutes–hours) or use a clean network, then resume — it is
+  idempotent.
+- **Card-level fallback**: because detail pages are often blocked, `crawl` also
+  persists what search cards expose — price, rooms, area_total, floor, address,
+  and **1–2 full-size photo URLs** per listing (photos live on an unblocked CDN).
+  This yields a usable dataset without detail pages. Fields only on the detail
+  page (area_kitchen/living, year_built, building_type, lat/lon, full gallery,
+  full description) stay NULL until `details` succeeds.
+- **Current data (2026-09-22)**: Kaskelen fully crawled — 266 listings, 247 with
+  a photo downloaded, deduped to 247 groups; `export --csv` emits 247 rows. Detail
+  enrichment pending (IP blocked). Add `--city almaty` for far more volume.
 - `crawl`, `photos`, `dedup`, `stats`, `export` and all parsing are validated;
-  parsers are covered by pytest against real saved fixtures.
+  parsers are covered by pytest (12 tests) against real saved fixtures.
 - Complex name (`complex_name`) is only populated when present in the params.
 
 ## TODO
