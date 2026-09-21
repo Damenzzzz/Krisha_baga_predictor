@@ -25,6 +25,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     ph = sub.add_parser("photos", help="download pending photos (httpx)")
     ph.add_argument("--limit", type=int, default=None)
+    ph.add_argument("--expand", action="store_true",
+                    help="discover a listing's FULL photo set via CDN index walk")
 
     sub.add_parser("dedup", help="assign near-duplicate group ids")
 
@@ -57,7 +59,7 @@ def main(argv: list[str] | None = None) -> int:
             details.run(db, ctrl, args.city, args.limit)
         elif args.command == "photos":
             from .commands import photos
-            photos.run(db, args.limit)
+            photos.run(db, args.limit, expand=args.expand)
         elif args.command == "dedup":
             from .dedup import run_dedup
             run_dedup(db)

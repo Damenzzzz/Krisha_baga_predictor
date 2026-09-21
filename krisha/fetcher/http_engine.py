@@ -58,6 +58,15 @@ class HttpEngine(Fetcher):
             log.warning("http error %s: %s", url, e)
             return FetchResult(url, None, "", self.name, latency)
 
+    def head(self, url: str) -> int | None:
+        """Cheap existence check (used to discover a listing's full photo set)."""
+        self._warmup()
+        try:
+            r = self._client.head(url, headers=config.default_headers())
+            return r.status_code
+        except httpx.HTTPError:
+            return None
+
     def get_bytes(self, url: str, referer: str | None = None) -> tuple[int | None, bytes]:
         """Download binary content (photos)."""
         self._warmup()

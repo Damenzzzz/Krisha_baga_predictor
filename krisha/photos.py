@@ -4,6 +4,8 @@ existing file path instead of writing a copy."""
 from __future__ import annotations
 
 import hashlib
+import json
+import re
 
 from . import config
 from .db import Database
@@ -11,6 +13,55 @@ from .fetcher.http_engine import HttpEngine
 from .logging_setup import get_logger
 
 log = get_logger("photos")
+
+# All photos of a listing share one CDN stem, indexed 1..N:
+#   https://krisha-photos.kcdn.online/webp/xx/<uuid>/<n>-full.jpg
+_STEM_RE = re.compile(r"^(https://krisha-photos\.kcdn\.online/[a-z]+/[0-9a-f]{2}/[0-9a-f-]{36})/\d+-\w+\.jpg")
+
+
+def expand_photos(db: Database, engine: HttpEngine | None = None,
+                  cap: int = 40, limit: int | None = None) -> dict[str, int]:
+    """Discover the FULL photo set of each listing by walking CDN indices.
+
+    The search card only exposes photo #1; the detail page (which enumerates
+    the album) is anti-bot blocked. Because every photo lives under the same
+    public CDN stem as photo #1, we walk `{stem}/{i}-full.jpg` until a 404 and
+    register every photo — no detail page, no evasion. Idempotent."""
+    own = engine is None
+    engine = engine or HttpEngine()
+    stats = {"listings": 0, "photos_added": 0}
+    try:
+        q = ("SELECT l.id AS lid, p.url AS first_url FROM listings l "
+             "JOIN photos p ON p.listing_id=l.id AND p.idx=0 "
+             "WHERE p.url LIKE '%kcdn%' AND (l.photos_count IS NULL OR l.photos_count<=2)")
+        if limit:
+            q += f" LIMIT {int(limit)}"
+        for row in db.conn.execute(q).fetchall():
+            lid, first_url = row["lid"], row["first_url"]
+            m = _STEM_RE.match(first_url)
+            if not m:
+                continue
+            stem = m.group(1)
+            urls: list[str] = []
+            for i in range(1, cap + 1):
+                u = f"{stem}/{i}-full.jpg"
+                if engine.head(u) != 200:
+                    break
+                urls.append(u)
+                db.upsert_photo(lid, i - 1, url=u)
+            if urls:
+                db.conn.execute(
+                    "UPDATE listings SET photo_urls=?, photos_count=? WHERE id=?",
+                    (json.dumps(urls, ensure_ascii=False), len(urls), lid),
+                )
+                db.commit()
+                stats["listings"] += 1
+                stats["photos_added"] += max(0, len(urls) - 1)
+        log.info("expand_photos: %s", stats)
+        return stats
+    finally:
+        if own:
+            engine.close()
 
 
 def download_pending(db: Database, engine: HttpEngine | None = None,
