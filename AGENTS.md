@@ -93,6 +93,7 @@ python -m krisha details [--city ...] [--limit N]      # Playwright
 python -m krisha photos  [--limit N]                   # httpx + sha256 dedup
 python -m krisha dedup                                  # assign duplicate_group_id
 python -m krisha embed   [--limit N] [--batch-size N]  # Phase B (needs Qdrant + torch)
+python -m krisha similar --image PATH [--city ...] [--limit N]  # Phase B similarity search
 python -m krisha stats
 python -m krisha export  --csv [--out path] [--no-dedup]
 ```
@@ -146,10 +147,23 @@ Typical flow: `crawl` → `details` → `photos` → `dedup` → (`embed`) → `
 - `crawl`, `photos`, `dedup`, `stats`, `export` and all parsing are validated;
   parsers are covered by pytest (12 tests) against real saved fixtures.
 - Complex name (`complex_name`) is only populated when present in the params.
+- **Phase B is live.** Qdrant (v1.19, `docker compose up -d qdrant`) holds the
+  `listing_photos` collection; `embed` encodes photos with open_clip
+  **`ViT-B-32-quickgelu` + `openai`** (the matched pair — plain `ViT-B-32` mispairs
+  the activation and degrades quality) and upserts (point id = `uuid5(sha256)`, so
+  identical photos collapse — idempotent). `similar --image PATH [--city ...]`
+  runs the smoke query: cosine search over the collection, optional city filter,
+  prints ranked matches with price/rooms/url. Validated end to end (self-match
+  score = 1.000, visually-similar neighbours ranked below, city filter honoured).
+  Full 67,850-photo embed is a ~2–3 h CPU run; re-runnable and resumable
+  (`embedded_at` gates it). Override the model via `CLIP_MODEL`/`CLIP_PRETRAINED`,
+  Qdrant via `QDRANT_URL`, and the data dir via `KRISHA_DATA_DIR` (lets a git
+  worktree run against the primary checkout's DB + photos).
 
 ## TODO
 - [ ] Scale `details` to ≥300 unique monthly listings with photos (Kaskelen → Almaty)
       once the IP is not greylisted.
-- [ ] Phase B: bring up Qdrant (`docker compose up -d qdrant`), run `embed`, and add
-      a small "find similar by one photo, filtered by city" smoke query.
+- [x] Phase B: Qdrant up, `embed` + `similar` smoke query working end to end
+      (quickgelu/openai CLIP, city-filtered cosine search). Full 67.8k embed runs
+      in the background; `stats` / collection `points_count` show progress.
 - [ ] Optional: parse `complexId -> complex_name` via the complexes endpoint.

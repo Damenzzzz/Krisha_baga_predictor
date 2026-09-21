@@ -15,7 +15,10 @@ from dotenv import load_dotenv
 PROJECT_ROOT = Path(__file__).resolve().parent.parent  # .../KrishaParser
 load_dotenv(PROJECT_ROOT / ".env")
 
-DATA_DIR = PROJECT_ROOT / "data"
+# DATA_DIR defaults to <repo>/data but can be pointed elsewhere via KRISHA_DATA_DIR.
+# This lets a git worktree (whose own data/ is gitignored and empty) run against
+# the primary checkout's DB + photos without copying gigabytes around.
+DATA_DIR = Path(os.getenv("KRISHA_DATA_DIR", str(PROJECT_ROOT / "data")))
 CACHE_DIR = DATA_DIR / "cache"
 PHOTOS_DIR = DATA_DIR / "photos"
 EXPORTS_DIR = DATA_DIR / "exports"

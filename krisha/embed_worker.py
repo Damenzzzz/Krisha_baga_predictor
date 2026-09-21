@@ -21,7 +21,10 @@ def _load_model():
     import open_clip  # type: ignore
     import torch  # type: ignore
 
-    model_name = os.getenv("CLIP_MODEL", "ViT-B-32")
+    # ViT-B-32-quickgelu + openai: the openai weights were trained with the
+    # QuickGELU activation; pairing them with plain "ViT-B-32" (GELU) triggers a
+    # runtime mismatch warning and degrades embedding quality. Keep them paired.
+    model_name = os.getenv("CLIP_MODEL", "ViT-B-32-quickgelu")
     pretrained = os.getenv("CLIP_PRETRAINED", "openai")
     device = os.getenv("CLIP_DEVICE", "cpu")
     model, _, preprocess = open_clip.create_model_and_transforms(
@@ -124,6 +127,44 @@ def run(db: Database, batch_size: int = 16, limit: int | None = None) -> dict:
     log.info("embed done: %s", stats)
     print(f"embed: {stats}")
     return stats
+
+
+def search_by_image(db: Database, image_path: str, city: str | None = None,
+                    limit: int = 10) -> list[dict]:
+    """Phase B smoke query: find listings whose photos look like ``image_path``.
+
+    Embeds the query image with the same CLIP model used for indexing and runs a
+    cosine search over the ``listing_photos`` collection, optionally filtered to a
+    single ``city``. Returns a ranked list of ``{score, payload, url}`` dicts."""
+    from PIL import Image  # type: ignore
+    from qdrant_client.models import Filter, FieldCondition, MatchValue  # type: ignore
+
+    model, preprocess, device, dim, torch = _load_model()
+    client = _client(dim)
+
+    img = Image.open(image_path).convert("RGB")
+    with torch.no_grad():
+        tensor = preprocess(img).unsqueeze(0).to(device)
+        feats = model.encode_image(tensor)
+        feats = feats / feats.norm(dim=-1, keepdim=True)
+    vector = feats.cpu().numpy()[0].tolist()
+
+    qfilter = None
+    if city:
+        qfilter = Filter(must=[FieldCondition(key="city", match=MatchValue(value=city))])
+
+    hits = client.query_points(COLLECTION, query=vector, query_filter=qfilter,
+                               limit=limit, with_payload=True).points
+    results = []
+    for h in hits:
+        payload = h.payload or {}
+        listing = db.get_listing(payload.get("listing_id"))
+        results.append({
+            "score": h.score,
+            "payload": payload,
+            "url": listing["url"] if listing is not None else None,
+        })
+    return results
 
 
 def _now() -> str:

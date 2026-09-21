@@ -34,6 +34,11 @@ def build_parser() -> argparse.ArgumentParser:
     e.add_argument("--limit", type=int, default=None)
     e.add_argument("--batch-size", type=int, default=16)
 
+    si = sub.add_parser("similar", help="find listings similar to one photo (Phase B)")
+    si.add_argument("--image", required=True, help="path to a query photo")
+    si.add_argument("--city", default=None, help="filter to a city (e.g. almaty)")
+    si.add_argument("--limit", type=int, default=10)
+
     sub.add_parser("stats", help="show scrape events + current profile")
 
     ex = sub.add_parser("export", help="export listings CSV for ML")
@@ -66,6 +71,9 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "embed":
             from .commands import embed
             embed.run(db, batch_size=args.batch_size, limit=args.limit)
+        elif args.command == "similar":
+            from .commands import similar
+            similar.run(db, args.image, city=args.city, limit=args.limit)
         elif args.command == "stats":
             from .commands import stats
             stats.run(db)
