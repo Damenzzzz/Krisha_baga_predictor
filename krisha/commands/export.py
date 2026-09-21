@@ -29,7 +29,12 @@ def run(db: Database, out_path: str | None = None, dedup: bool = True) -> str:
     for r in rows:
         if r["rent_period"] not in (None, "month"):
             continue
-        if r["detail_fetched_at"] is None:
+        # Keep rows usable for ML: either detail-enriched, or with the core
+        # card fields (price + area). Detail pages may be unavailable (anti-bot),
+        # in which case card-level data still forms a valid dataset.
+        has_detail = r["detail_fetched_at"] is not None
+        has_core = r["price_kzt"] is not None and r["area_total"] is not None
+        if not (has_detail or has_core):
             continue
         gid = r["duplicate_group_id"]
         if dedup and gid:
