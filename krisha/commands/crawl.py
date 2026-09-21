@@ -47,6 +47,8 @@ def run(db: Database, ctrl: Controller, city: str, max_pages: int | None = None)
                 card_data = {"rooms": card.rooms, "area_total": card.area_total,
                              "price_kzt": card.price_kzt, "address": card.address}
             is_new = db.upsert_stub(cid, config.detail_url(cid), city, card_data)
+            if card and card.photos:
+                db.add_card_photos(cid, card.photos)
             stats["new" if is_new else "seen"] += 1
 
         stats["pages"] += 1

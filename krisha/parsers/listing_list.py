@@ -26,6 +26,7 @@ class Card:
     rooms: int | None = None
     area_total: float | None = None
     address: str | None = None
+    photos: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -64,6 +65,11 @@ def parse_list(html: str) -> ListPage:
         price_node = card.css_first(CARD_PRICE)
         sub_node = card.css_first(CARD_SUBTITLE)
         areas = N.parse_areas(title)
+        photos: list[str] = []
+        for node in card.css("[data-full-src]"):
+            src = node.attr("data-full-src")
+            if src and src.startswith("http") and src not in photos:
+                photos.append(src)
         page.cards[cid] = Card(
             id=cid,
             url=config.detail_url(cid),
@@ -71,6 +77,7 @@ def parse_list(html: str) -> ListPage:
             rooms=N.parse_rooms(title),
             area_total=areas["area_total"],
             address=N.clean(sub_node.text()) if sub_node else None,
+            photos=photos,
         )
 
     # Fallback: if window.data had no ids, take unique ids from card links.

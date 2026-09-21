@@ -19,3 +19,10 @@ def test_parse_list_cards_have_urls():
     sample = next(iter(page.cards.values()))
     assert sample.url.startswith("https://krisha.kz/a/show/")
     assert sample.id > 0
+
+
+def test_parse_list_cards_carry_photos():
+    page = parse_list(read_fixture("list_kaskelen.html"))
+    with_photos = [c for c in page.cards.values() if c.photos]
+    assert with_photos, "expected at least some cards with photo urls"
+    assert all(u.startswith("http") for c in with_photos for u in c.photos)

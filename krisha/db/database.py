@@ -96,6 +96,20 @@ class Database:
         )
         self.conn.commit()
 
+    def add_card_photos(self, listing_id: int, urls: list[str]) -> None:
+        """Attach photo urls discovered on a search card (fills photos when the
+        detail page is unavailable). Does not set detail_fetched_at."""
+        if not urls:
+            return
+        self.conn.execute(
+            "UPDATE listings SET photo_urls=?, photos_count=? WHERE id=? "
+            "AND (photos_count IS NULL OR photos_count=0)",
+            (json.dumps(urls, ensure_ascii=False), len(urls), listing_id),
+        )
+        for idx, url in enumerate(urls):
+            self.upsert_photo(listing_id, idx, url=url)
+        self.conn.commit()
+
     def set_duplicate_group(self, listing_id: int, group_id: str) -> None:
         self.conn.execute(
             "UPDATE listings SET duplicate_group_id=? WHERE id=?",
