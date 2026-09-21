@@ -35,9 +35,12 @@ def _now() -> str:
 class Database:
     def __init__(self, path: Path | str = config.DB_PATH):
         self.path = str(path)
-        self.conn = sqlite3.connect(self.path)
+        self.conn = sqlite3.connect(self.path, timeout=30.0)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA journal_mode=WAL;")
+        # Let concurrent writers (e.g. `embed` and `details` running at once) wait
+        # for the lock instead of failing immediately with "database is locked".
+        self.conn.execute("PRAGMA busy_timeout=30000;")
         self.init_db()
 
     def init_db(self) -> None:
