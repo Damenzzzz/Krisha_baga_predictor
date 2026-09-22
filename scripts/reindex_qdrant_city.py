@@ -17,10 +17,9 @@ Usage (Qdrant must be up: `docker compose up -d qdrant`):
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 
-from krisha.embed_worker import COLLECTION
+from krisha.embed_worker import COLLECTION, make_client
 from krisha.parsers.normalize import normalize_city
 
 
@@ -29,9 +28,7 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true", help="report only, no writes")
     args = ap.parse_args()
 
-    from qdrant_client import QdrantClient  # lazy: heavy dep
-
-    client = QdrantClient(url=os.getenv("QDRANT_URL", "http://localhost:6333"), timeout=30)
+    client = make_client()
     cols = {c.name for c in client.get_collections().collections}
     if COLLECTION not in cols:
         print(f"collection {COLLECTION!r} not found; run `embed` first")

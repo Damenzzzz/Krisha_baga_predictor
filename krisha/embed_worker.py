@@ -17,6 +17,23 @@ _NAMESPACE = uuid.UUID("00000000-0000-0000-0000-00000000c11b")  # stable ns for 
 COLLECTION = os.getenv("QDRANT_COLLECTION", "listing_photos")
 
 
+def make_client(url: str | None = None, api_key: str | None = None,
+                timeout: int = 30):
+    """Construct a QdrantClient for either local Docker or Qdrant Cloud.
+
+    Defaults come from the env: QDRANT_URL (falls back to local Docker) and
+    QDRANT_API_KEY (None for local, the cluster key for cloud). Pass explicit
+    url/api_key to target a specific instance (e.g. migrating local -> cloud).
+    """
+    from qdrant_client import QdrantClient  # type: ignore
+    key = api_key if api_key is not None else os.getenv("QDRANT_API_KEY")
+    return QdrantClient(
+        url=url or os.getenv("QDRANT_URL", "http://localhost:6333"),
+        api_key=key or None,   # coerce "" -> None so local Docker stays unauthenticated
+        timeout=timeout,
+    )
+
+
 def _load_model():
     import open_clip  # type: ignore
     import torch  # type: ignore
@@ -32,10 +49,9 @@ def _load_model():
 
 
 def _client(dim: int):
-    from qdrant_client import QdrantClient  # type: ignore
     from qdrant_client.models import Distance, VectorParams, PayloadSchemaType  # type: ignore
 
-    client = QdrantClient(url=os.getenv("QDRANT_URL", "http://localhost:6333"))
+    client = make_client()
     existing = {c.name for c in client.get_collections().collections}
     if COLLECTION not in existing:
         client.create_collection(

@@ -134,19 +134,21 @@ Typical flow: `crawl` → `details` → `photos` → `dedup` → (`embed`) → `
   This yields a usable dataset without detail pages. Fields only on the detail
   page (area_kitchen/living, year_built, building_type, lat/lon, full gallery,
   full description) stay NULL until `details` succeeds.
-- **Current data (2026-09-22)**: Kaskelen + Almaty crawled — **7485 listings**
-  (`almaty` 7217, `kaskelen` 268 after city canonicalization; see below),
-  **7198 with photos**. Full albums recovered via CDN index-walk (`photos --expand`):
-  **72,963 photos downloaded** (1 dead 404 URL pending), **all 72,963 embedded** into
-  Qdrant `listing_photos` (71,679 unique points after sha256 dedup).
-  Deduped to **7287 groups**; `export --csv` emits ~7287 rows. **Details fetched for
-  3084 listings** (Playwright, clean IP) — these carry `lat/lon` (3084),
-  `area_kitchen` (1510), `complex_name` (1607), full `description` (3082). Card-level
-  fields present for ~all rows. **Descriptions: 7314/7485 (97.7%)** parsed — the 171
-  NULLs are card-only rows whose search card had no snippet (expected).
-- **Phase B validated**: `python -m scripts.smoke_similar --city <c>` encodes one photo,
-  searches Qdrant unfiltered + filtered-by-city, and asserts the `city` filter leaks
-  nothing (PASS). Confirms the vector index + KEYWORD `city` payload work end to end.
+- **Current data (2026-09-22)**: Almaty city + **whole Almaty oblast** + Kaskelen
+  crawled — **9210 listings** (`almaty` 7805, `almaty_oblast` 1137, `kaskelen` 268).
+  Full albums recovered via CDN index-walk (`photos --expand`): **85,611 photos
+  downloaded** (1 dead 404 URL), **all embedded** into Qdrant `listing_photos`
+  (**84,169 unique points** after sha256 dedup). Deduped to **8966 groups** (203 with
+  >1 member); `export --csv` emits **8966 rows**. **Details fetched for 3084 listings**
+  (Playwright, clean IP): `lat/lon` (3084), `area_kitchen` (1510), `complex_name` (1607).
+  **Descriptions: 9144/9210 (99.3%)** parsed — the NULLs are card-only rows whose search
+  card had no snippet (expected).
+- **Qdrant is hosted on Qdrant Cloud** (set `QDRANT_URL` + `QDRANT_API_KEY` in `.env`;
+  `make_client()` in `embed_worker.py` reads both — empty key ⇒ local Docker). Vectors
+  were migrated local→cloud (no re-encode) via `python -m scripts.migrate_qdrant`.
+- **Phase B validated (against cloud)**: `python -m scripts.smoke_similar --city <c>`
+  encodes one photo, searches Qdrant unfiltered + filtered-by-city, and asserts the
+  `city` filter leaks nothing (PASS). Confirms the vector index + KEYWORD `city` payload.
 - **Known detail-field gaps** (need a fresh detail page + re-fetch to fix; `/a/show/`
   is 468-blocked from this network): `year_built` and `building_type` populate on only
   **1/3084** rows. `live.square`/`map.complex` params parse fine, so `house.year` /
@@ -157,16 +159,21 @@ Typical flow: `crawl` → `details` → `photos` → `dedup` → (`embed`) → `
   `parsers/normalize.py::normalize_city`, applied at the DB layer (`upsert_stub` +
   `update_detail`). This fixed a split where crawl stored the CLI arg (`almaty`) and
   detail overwrote it from JSON (`Almaty`), breaking the Qdrant `city` filter. Existing
-  DB rows (3084) were migrated and the 9745 stale-cased Qdrant payloads were patched via
-  `python -m scripts.reindex_qdrant_city` (idempotent; re-run after any future re-embed).
+  DB rows were migrated. **Payload resync**: after any crawl/embed/dedup run
+  `python -m scripts.resync_qdrant_payload` — it patches stale `city` **and**
+  `duplicate_group_id` on points from the DB (dedup runs after embed, so fresh points
+  carry a NULL group until resynced). Idempotent. (`scripts/reindex_qdrant_city.py` is
+  the older city-only version, superseded by the resync script.)
 - `crawl`, `photos`, `dedup`, `stats`, `export` and all parsing are validated;
   parsers are covered by pytest (12 tests) against real saved fixtures.
 - Complex name (`complex_name`) is only populated when present in the params.
 
 ## TODO
 - [x] Scale `details` to ≥300 unique monthly listings with photos — **done: 3084**.
-- [x] Phase B embed — **done: all 67,850 photos embedded** into Qdrant `listing_photos`.
+- [x] Phase B embed — **done: all 85,611 photos embedded** into Qdrant `listing_photos`.
 - [x] Phase B smoke query — **done: `scripts/smoke_similar.py`**, city filter airtight.
+- [x] Move Qdrant to cloud — **done**: `make_client()` + `scripts/migrate_qdrant.py`.
+- [x] Crawl whole Almaty oblast + city — **done: 9210 listings** (`almaty_oblast` path).
 - [ ] Recover `year_built` / `building_type` / `bathroom` / `balcony`: these params
       populate on ≤1/3084 rows while `live.square`/`map.complex`/`flat.renovation`/
       `flat.furniture` parse fine — the failing `data-name`s (`house.year`,
@@ -175,6 +182,6 @@ Typical flow: `crawl` → `details` → `photos` → `dedup` → (`embed`) → `
       `data-name`s, fix `parsers/selectors.py::PARAM_MAP`, then re-run `details` to
       backfill. NOTE: `/a/show/` is 468-blocked from this network right now
       (`details` hits 468 immediately) — needs a clean IP.
-- [ ] Backfill remaining detail pages: 4401 listings have `detail_fetched_at IS NULL`
+- [ ] Backfill remaining detail pages: 6126 listings have `detail_fetched_at IS NULL`
       (no lat/lon, kitchen area, etc.). Idempotent — resume `details` once IP is clean.
 - [ ] Optional: parse `complexId -> complex_name` via the complexes endpoint.

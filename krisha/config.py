@@ -63,6 +63,11 @@ BASE_URL = "https://krisha.kz"
 CITY_PATHS = {
     "kaskelen": "/arenda/kvartiry/kaskelen/",
     "almaty": "/arenda/kvartiry/almaty/",
+    # Whole Almaty oblast (region) — Kaskelen, Talgar, Esik, Kapshagai, … The
+    # per-listing town lives in the address/detail; `city` here is the crawl
+    # bucket. Kaskelen listings already crawled keep city='kaskelen' (upsert
+    # never rewrites city), so only new oblast towns land under 'almaty_oblast'.
+    "almaty_oblast": "/arenda/kvartiry/almatinskaja-oblast/",
 }
 LISTINGS_PER_PAGE = 20  # krisha default page size (window.data.search.ids)
 

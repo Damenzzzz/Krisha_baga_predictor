@@ -10,11 +10,10 @@ Usage (Qdrant up, photos embedded):
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 
 from krisha.db import Database
-from krisha.embed_worker import COLLECTION, _load_model
+from krisha.embed_worker import COLLECTION, _load_model, make_client
 
 
 def _pick_query(db: Database, city: str | None):
@@ -39,7 +38,6 @@ def main() -> int:
     args = ap.parse_args()
 
     from PIL import Image  # type: ignore
-    from qdrant_client import QdrantClient  # type: ignore
     from qdrant_client.models import Filter, FieldCondition, MatchValue  # type: ignore
 
     db = Database()
@@ -59,7 +57,7 @@ def main() -> int:
         vec = model.encode_image(preprocess(img).unsqueeze(0).to(device))
         vec = (vec / vec.norm(dim=-1, keepdim=True)).cpu().numpy()[0].tolist()
 
-    client = QdrantClient(url=os.getenv("QDRANT_URL", "http://localhost:6333"), timeout=30)
+    client = make_client()
 
     def show(title, flt):
         hits = client.query_points(COLLECTION, query=vec, limit=args.topk,
