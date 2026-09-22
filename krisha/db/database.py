@@ -13,6 +13,7 @@ from typing import Any, Iterable, Sequence
 
 from .. import config
 from ..logging_setup import get_logger
+from ..parsers.normalize import normalize_city
 
 log = get_logger("db")
 _SCHEMA = Path(__file__).with_name("schema.sql")
@@ -59,6 +60,7 @@ class Database:
         """Insert a listing id discovered on a search page. Returns True if new."""
         now = _now()
         card = card or {}
+        city = normalize_city(city)
         cur = self.conn.execute("SELECT id FROM listings WHERE id=?", (listing_id,))
         exists = cur.fetchone() is not None
         if exists:
@@ -90,6 +92,8 @@ class Database:
 
     def update_detail(self, listing_id: int, fields: dict[str, Any]) -> None:
         """Fill parsed detail fields on an existing listing row."""
+        if "city" in fields:
+            fields["city"] = normalize_city(fields["city"])
         cols = [c for c in LISTING_FIELDS if c in fields]
         if not cols:
             return

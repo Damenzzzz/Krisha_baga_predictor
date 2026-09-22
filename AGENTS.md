@@ -134,22 +134,47 @@ Typical flow: `crawl` → `details` → `photos` → `dedup` → (`embed`) → `
   This yields a usable dataset without detail pages. Fields only on the detail
   page (area_kitchen/living, year_built, building_type, lat/lon, full gallery,
   full description) stay NULL until `details` succeeds.
-- **Current data (2026-09-22)**: Kaskelen + Almaty crawled — **7485 listings**,
-  **7199 with photos**. Full albums recovered via CDN index-walk (`photos --expand`):
-  **67,850 photos, all downloaded** (0 pending), avg **9.4 photos/listing** (max 40),
-  ~66.8k files on disk. Deduped to **7287 groups**; `export --csv` emits **7287 rows**.
-  Card-level fields present for ~all rows (price, rooms, area_total, floor,
-  floors_total, address, description snippet). Detail-only fields
-  (area_kitchen/living, year_built, building_type, lat/lon, full description,
-  amenities) remain NULL — `/a/show/` is IP-blocked (468) from this network;
-  `detail_fetched_at` count = 1 (fixture).
+- **Current data (2026-09-22)**: Kaskelen + Almaty crawled — **7485 listings**
+  (`almaty` 7217, `kaskelen` 268 after city canonicalization; see below),
+  **7198 with photos**. Full albums recovered via CDN index-walk (`photos --expand`):
+  **72,963 photos downloaded** (1 dead 404 URL pending), **all 72,963 embedded** into
+  Qdrant `listing_photos` (71,679 unique points after sha256 dedup).
+  Deduped to **7287 groups**; `export --csv` emits ~7287 rows. **Details fetched for
+  3084 listings** (Playwright, clean IP) — these carry `lat/lon` (3084),
+  `area_kitchen` (1510), `complex_name` (1607), full `description` (3082). Card-level
+  fields present for ~all rows. **Descriptions: 7314/7485 (97.7%)** parsed — the 171
+  NULLs are card-only rows whose search card had no snippet (expected).
+- **Phase B validated**: `python -m scripts.smoke_similar --city <c>` encodes one photo,
+  searches Qdrant unfiltered + filtered-by-city, and asserts the `city` filter leaks
+  nothing (PASS). Confirms the vector index + KEYWORD `city` payload work end to end.
+- **Known detail-field gaps** (need a fresh detail page + re-fetch to fix; `/a/show/`
+  is 468-blocked from this network): `year_built` and `building_type` populate on only
+  **1/3084** rows. `live.square`/`map.complex` params parse fine, so `house.year` /
+  `flat.building` are either absent on most live listings or renamed vs the old
+  fixture — diagnose against a live page before touching `PARAM_MAP`. `area_living`
+  (84 rows) is likewise rarely present in the `live.square` string.
+- **City is canonicalized** to lowercase ASCII keys (`almaty`, `kaskelen`) in
+  `parsers/normalize.py::normalize_city`, applied at the DB layer (`upsert_stub` +
+  `update_detail`). This fixed a split where crawl stored the CLI arg (`almaty`) and
+  detail overwrote it from JSON (`Almaty`), breaking the Qdrant `city` filter. Existing
+  DB rows (3084) were migrated and the 9745 stale-cased Qdrant payloads were patched via
+  `python -m scripts.reindex_qdrant_city` (idempotent; re-run after any future re-embed).
 - `crawl`, `photos`, `dedup`, `stats`, `export` and all parsing are validated;
   parsers are covered by pytest (12 tests) against real saved fixtures.
 - Complex name (`complex_name`) is only populated when present in the params.
 
 ## TODO
-- [ ] Scale `details` to ≥300 unique monthly listings with photos (Kaskelen → Almaty)
-      once the IP is not greylisted.
-- [ ] Phase B: bring up Qdrant (`docker compose up -d qdrant`), run `embed`, and add
-      a small "find similar by one photo, filtered by city" smoke query.
+- [x] Scale `details` to ≥300 unique monthly listings with photos — **done: 3084**.
+- [x] Phase B embed — **done: all 67,850 photos embedded** into Qdrant `listing_photos`.
+- [x] Phase B smoke query — **done: `scripts/smoke_similar.py`**, city filter airtight.
+- [ ] Recover `year_built` / `building_type` / `bathroom` / `balcony`: these params
+      populate on ≤1/3084 rows while `live.square`/`map.complex`/`flat.renovation`/
+      `flat.furniture` parse fine — the failing `data-name`s (`house.year`,
+      `flat.building`, `flat.toilet`, `flat.balcony`) look renamed on the live site.
+      Capture a live `/a/show/` detail page from a clean IP, confirm the real
+      `data-name`s, fix `parsers/selectors.py::PARAM_MAP`, then re-run `details` to
+      backfill. NOTE: `/a/show/` is 468-blocked from this network right now
+      (`details` hits 468 immediately) — needs a clean IP.
+- [ ] Backfill remaining detail pages: 4401 listings have `detail_fetched_at IS NULL`
+      (no lat/lon, kitchen area, etc.). Idempotent — resume `details` once IP is clean.
 - [ ] Optional: parse `complexId -> complex_name` via the complexes endpoint.
