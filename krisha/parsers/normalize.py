@@ -14,6 +14,28 @@ def clean(text: str | None) -> str | None:
     return t or None
 
 
+# Canonical (lowercase, ASCII) city keys — match config.CITY_PATHS and the CLI
+# --city argument. The crawl path stores the CLI arg ("almaty"); the detail path
+# stores window.data's addressTitle ("Almaty"/"Алматы"), which split the same
+# city across values and broke city filtering (incl. the Qdrant payload index).
+_CITY_ALIASES: dict[str, str] = {
+    "almaty": "almaty",
+    "алматы": "almaty",
+    "kaskelen": "kaskelen",
+    "каскелен": "kaskelen",
+}
+
+
+def normalize_city(value: str | None) -> str | None:
+    """Canonicalize a city name to a single lowercase key so crawl (CLI arg)
+    and detail (JSON) paths never split the same city. Unknown cities are just
+    lowercased/cleaned so nothing is dropped."""
+    c = clean(value)
+    if not c:
+        return None
+    return _CITY_ALIASES.get(c.lower(), c.lower())
+
+
 def to_int(value) -> int | None:
     if value is None:
         return None
