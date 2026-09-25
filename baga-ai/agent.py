@@ -39,6 +39,7 @@ class State(TypedDict, total=False):
     photo_rooms: Optional[list[str]]
     assumptions: list[str]
     assumed_fields: list[str]
+    warnings: list[str]
     confirmed: bool
     relaxed: list[str]
     attempts: int
@@ -55,9 +56,11 @@ def parse_node(state: State) -> dict:
     p = parse(state["query"])
     return {"filters": p.filters.model_dump(exclude_none=True), "style": p.style,
             "photo_rooms": p.photo_rooms, "assumptions": p.assumptions,
-            "assumed_fields": p.assumed_fields,
+            "assumed_fields": p.assumed_fields, "warnings": p.warnings,
             "attempts": 0, "relaxed": [],
-            "log": [f"разобрал запрос: условия={p.filters.model_dump(exclude_none=True)}, стиль='{p.style}'"]}
+            "log": [f"разобрал запрос ({p.source or 'llm'}): условия={p.filters.model_dump(exclude_none=True)}, "
+                    f"стиль='{p.style}'"]
+                   + [f"входной фильтр: {w}" for w in p.warnings]}
 
 
 def confirm_node(state: State) -> dict:
@@ -117,6 +120,8 @@ def answer_node(state: State) -> dict:
         return {"answer": "По таким условиям ничего не нашлось, даже после ослабления фильтров.",
                 "log": ["ответ: пусто"]}
     text = answer_search(state["query"], state["results"])
+    if state.get("warnings"):
+        text = "Обратите внимание: " + "; ".join(state["warnings"]) + ".\n\n" + text
     if state.get("relaxed"):
         text += "\n\nЧтобы что-то найти, пришлось ослабить условия: " + "; ".join(
             n for n in state["relaxed"] if n != "предел") + "."
@@ -162,6 +167,29 @@ def graph():
     if _graph is None:
         _graph = build_graph()
     return _graph
+
+
+def invoke(query: str | None = None, *, resume=None, thread_id: str, user_id: str | None = None,
+           channel: str = "web") -> tuple[dict[str, Any], str | None]:
+    """Один шаг графа — запуск (query) или продолжение после паузы (resume) — внутри
+    трейса Langfuse. Возвращает (состояние, trace_id): по trace_id потом пишется 👍/👎.
+
+    Сайт и Telegram-бот вызывают только это: пауза на подтверждение у них выглядит
+    по-разному (кнопки Streamlit / inline-кнопки Telegram), а граф один."""
+    import tracing
+    inp = Command(resume=resume) if resume is not None else {"query": query}
+    cfg = {"configurable": {"thread_id": thread_id}, "callbacks": tracing.langchain_callbacks(),
+           "run_name": "baga-agent"}
+    with tracing.trace_context(user_id=user_id, session_id=thread_id, tags=[channel], name="assistant"):
+        with tracing.span("assistant", kind="AGENT",
+                          **{"input.value": query if resume is None else f"resume={resume}"}) as sp:
+            state = graph().invoke(inp, cfg)
+            trace_id = tracing.current_trace_id()
+            paused = "__interrupt__" in state
+            sp.set(output="(пауза: подтверждение)" if paused else state.get("answer"),
+                   n_results=len(state.get("results") or []), paused=paused)
+    tracing.flush()
+    return state, trace_id
 
 
 def run(query: str, thread_id: str = "cli", on_confirm=None) -> dict[str, Any]:
