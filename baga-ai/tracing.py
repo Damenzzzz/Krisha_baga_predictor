@@ -17,6 +17,13 @@ Phoenix остаётся для офлайн-работы без аккаунт�
 import contextlib
 import os
 import sys
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# ключи Langfuse — в .env; config.py его тоже грузит, но тянет torch, а трейсинг
+# импортируется и там, где config ещё не нужен
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 # типы observation в Langfuse совпадают по смыслу с openinference-видами Phoenix
 _LF_TYPES = {"CHAIN": "chain", "RETRIEVER": "retriever", "TOOL": "tool", "AGENT": "agent",
