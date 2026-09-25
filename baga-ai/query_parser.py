@@ -12,13 +12,14 @@ price_max, и половина вариантов молча отвалится.
 а всё, что модель всё же добавила от себя, помечается и выносится на подтверждение
 пользователю (assumptions).
 """
+import hashlib
 import json
 import re
 from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from config import CHAT_KEY, CHAT_MODEL, CHAT_URL
+from guardrails import check_input
 from listings import Filters, load_listings
 
 SYSTEM = """Ты разбираешь запрос об аренде квартиры на структурированные условия и описание стиля.
@@ -51,13 +52,22 @@ class ParsedQuery(BaseModel):
                                    description="условия, которых пользователь явно не называл (текстом)")
     assumed_fields: list[str] = Field(default_factory=list,
                                       description="имена этих полей — по ним их можно убрать при отказе")
+    warnings: list[str] = Field(default_factory=list,
+                                description="предупреждения входного фильтра: другой город, покупка, инъекция")
+    source: str = Field("", description="кто разобрал: llm:<провайдер>, cache, rules")
 
 
-def _client():
-    from openai import OpenAI
-    import tracing
-    cl = OpenAI(api_key=CHAT_KEY, base_url=CHAT_URL)
-    return tracing.wrap_llm_client(cl)
+# Версия промпта входит в ключ кэша: поменяли промпт — старые разборы не используются.
+PROMPT_VERSION = hashlib.sha1(SYSTEM.encode()).hexdigest()[:8]
+_cache = None
+
+
+def _semantic_cache():
+    global _cache
+    if _cache is None:
+        from semantic_cache import SemanticCache
+        _cache = SemanticCache(f"parse_query:{PROMPT_VERSION}")
+    return _cache
 
 
 def _json_from(text: str) -> dict:
@@ -92,18 +102,49 @@ def _rule_based(query: str) -> ParsedQuery:
     return ParsedQuery(filters=f, style=query, assumptions=["разбор без LLM (запасной режим)"])
 
 
-def parse(query: str, use_llm: bool = True) -> ParsedQuery:
+def parse(query: str, use_llm: bool = True, use_cache: bool = True) -> ParsedQuery:
+    guard = check_input(query)
+    query = guard.text                     # PII замаскированы — в LLM и трейсы они не уходят
+    if guard.blocked:
+        # инъекцию в модель не отправляем; регулярки её «не услышат», а стиль всё равно
+        # пойдёт в поиск по фото — пользователь получит выдачу, модель не получит команд
+        p = _rule_based(query)
+        p.assumptions = []
+        p.warnings = guard.warnings + ["запрос содержит инструкции для модели — разобран без LLM"]
+        return p
     if not use_llm:
-        return _rule_based(query)
+        p = _rule_based(query)
+        p.warnings, p.source = guard.warnings, "rules"
+        return p
+    cached, _ = _semantic_cache().lookup(query) if use_cache else (None, {})
+    if cached is not None:
+        p = ParsedQuery(**cached)
+        p.warnings, p.source = guard.warnings, "cache"
+        return p
     try:
-        r = _client().chat.completions.create(
-            model=CHAT_MODEL, temperature=0, max_tokens=400,
-            messages=[{"role": "system", "content": SYSTEM},
-                      {"role": "user", "content": f"Известные районы: {', '.join(_known_districts())}\n\n"
-                                                  f"Запрос: {query}"}])
-        d = _json_from(r.choices[0].message.content)
+        d, r = llm_parse(query)
     except Exception:
-        return _rule_based(query)          # фолбэк: пользователь всё равно получит выдачу
+        p = _rule_based(query)             # фолбэк: пользователь всё равно получит выдачу
+        p.warnings = guard.warnings
+        return p
+    p = _from_llm(query, d)
+    p.warnings, p.source = guard.warnings, f"llm:{r.provider}"
+    if use_cache:
+        _semantic_cache().put(query, p.model_dump(exclude={"warnings", "source"}))
+    return p
+
+
+def llm_parse(query: str, providers=None, thinking=None):
+    """Сырой разбор моделью: (dict, LLMResult). Отдельно — чтобы A/B сравнивал модели
+    на одном и том же промпте без кэша и guardrails."""
+    import llm
+    user = f"Известные районы: {', '.join(_known_districts())}\n\nЗапрос: {query}"
+    return llm.complete_json(SYSTEM, user, task="parse_query", temperature=0, max_tokens=400,
+                             providers=providers, thinking=thinking, use_cache=False)
+
+
+def _from_llm(query: str, d: dict) -> ParsedQuery:
+    d = dict(d)
 
     style = (d.pop("style", "") or "").strip()
     photo_rooms = d.pop("photo_rooms", None)
