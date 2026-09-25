@@ -16,11 +16,15 @@
 
 ## Как это выглядит
 
-| Ассистент: разбор запроса, поиск по фото кухонь, ответ со ссылками | Человек в контуре: модель додумала город — спрашиваем |
+![главная](baga-ai/docs/screenshots/home_hero.png)
+
+| Ассистент: разбор запроса и ответ со ссылками | Человек в контуре: модель додумала город — спрашиваем |
 |---|---|
-| ![ассистент](baga-ai/docs/screenshots/assistant.png) | ![подтверждение](baga-ai/docs/screenshots/assistant_confirm.png) |
-| **Гость: поиск по описанию ремонта, вердикт по цене** | **Админ: расход LLM, провайдеры, кэш, отзывы** |
-| ![поиск](baga-ai/docs/screenshots/search_guest.png) | ![админка](baga-ai/docs/screenshots/admin.png) |
+| ![ассистент](baga-ai/docs/screenshots/app_assistant.png) | ![подтверждение](baga-ai/docs/screenshots/app_pause.png) |
+| **Найденные квартиры: фото кухонь и коридор цены** | **Проверка цены по ссылке krisha.kz** |
+| ![карточки](baga-ai/docs/screenshots/app_cards.png) | ![цена](baga-ai/docs/screenshots/app_price.png) |
+| **Панель админа: расход, модели, отзывы** | **Телефон** |
+| ![админка](baga-ai/docs/screenshots/admin.png) | ![телефон](baga-ai/docs/screenshots/home_mobile.png) |
 
 ## Состав
 
@@ -55,7 +59,7 @@ docker compose up -d      # → http://localhost:8501
 | Golden dataset ≥ 30, 2+ метрики | `evals.py`, `ab_models.py` | 32 запроса поиска (precision@5, LLM-судья), 36 запросов разбора (5 метрик) |
 | A/B эксперимент | `ab_models.py`, `ab_generation.py`, `evals.py` | ALEM против Gemini, thinking, temperature/top_p/max_tokens, каналы, язык запроса |
 | Выбор LLM и гиперпараметров с обоснованием | ARCHITECTURE «Выбор моделей», EVALS 3 и 6 | цена, латентность и качество в одной таблице |
-| Веб-фронтенд | `baga-ai/app.py` | Streamlit: ассистент, поиск по описанию и по фото |
+| Веб-фронтенд | `baga-ai/server.py`, `baga-ai/web/` | FastAPI + собственный фронтенд: главная с живым демо, ассистент, поиск по описанию и по фото, проверка цены, вход, панель админа |
 | **Рекомендуемые** | | |
 | Guardrails | `guardrails.py` | инъекции (recall 95%), PII, домен, сверка сумм и id на выходе |
 | Кэширование | `llm.py`, `semantic_cache.py` | точный кэш ответов + смысловой кэш разбора с порогом из эксперимента |
