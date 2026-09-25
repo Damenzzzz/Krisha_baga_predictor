@@ -15,6 +15,9 @@ CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 html, body, [class*="st-"] { font-family: 'Inter', -apple-system, sans-serif; }
+/* иконки Streamlit — лигатуры шрифта Material Symbols: без этого вместо стрелки видно «expand_more» */
+[data-testid="stIconMaterial"], [class*="material-symbols"], span[translate="no"] {
+  font-family: 'Material Symbols Rounded' !important; }
 #MainMenu, footer, header [data-testid="stStatusWidget"] { visibility: hidden; }
 .block-container { padding-top: 2.2rem; padding-bottom: 3rem; max-width: 1180px; }
 
