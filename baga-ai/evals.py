@@ -12,7 +12,7 @@
 
 Метрика 2 — LLM-as-judge.
     Для стилевых запросов («уютная кухня в тёплых тонах») формального признака нет.
-    Судья (alemllm, temperature=0) видит запрос и описание найденного объявления
+    Судья (шлюз llm.py: Gemini 3.6 Flash → ALEM, temperature=0) видит запрос и описание найденного объявления
     и отвечает, подходит ли. Считаем долю «да» в топ-5.
 
 Эксперименты: каналы (фото / описания / слияние RRF), язык запроса (ру / англ / оба),
@@ -171,24 +171,26 @@ JUDGE_SYSTEM = """Ты оцениваешь релевантность квар�
 Если данных в описании недостаточно, отвечай "нет"."""
 
 
-def judge_one(args) -> int:
+def judge_one(args, providers=None) -> int | None:
+    """1 — релевантно, 0 — нет, None — судья не ответил (не считаем за «нет»,
+    иначе падение модели выглядело бы как плохой поиск)."""
     query, description = args
-    from explain import _client
-    from config import CHAT_MODEL
+    import llm
+    from config import JUDGE_CHAIN
     try:
-        r = _client().chat.completions.create(
-            model=CHAT_MODEL, temperature=0, max_tokens=5,
-            messages=[{"role": "system", "content": JUDGE_SYSTEM},
-                      {"role": "user", "content": f"Запрос: {query}\n\nОписание квартиры: {description[:700]}"}])
-        return int("да" in r.choices[0].message.content.strip().lower())
+        r = llm.complete(JUDGE_SYSTEM, f"Запрос: {query}\n\nОписание квартиры: {description[:700]}",
+                         task="judge", temperature=0, max_tokens=10, thinking="minimal",
+                         providers=providers or JUDGE_CHAIN)
+        return int("да" in r.text.strip().lower())
     except Exception:
-        return 0
+        return None
 
 
 def judge_precision(bench: Bench, query: str, listing_ids, workers=8) -> float:
     pairs = [(query, bench.desc.get(lid, "")) for lid in listing_ids]
     with ThreadPoolExecutor(max_workers=workers) as ex:
-        return float(np.mean(list(ex.map(judge_one, pairs)))) if pairs else 0.0
+        votes = [v for v in ex.map(judge_one, pairs) if v is not None]
+    return float(np.mean(votes)) if votes else float("nan")
 
 
 # --------------------------------------------------------------- прогон

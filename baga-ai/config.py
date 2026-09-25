@@ -2,7 +2,6 @@
 import os
 from pathlib import Path
 
-import torch
 from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parent
@@ -11,7 +10,7 @@ load_dotenv(ROOT / ".env")
 # ---------------------------------------------------------------- данные (от парсера)
 DATA_DIR = Path(os.getenv("KRISHA_DATA", ROOT / "data"))
 LISTINGS_RAW = Path(os.getenv("LISTINGS_RAW", DATA_DIR / "listings_raw.parquet"))  # csv/parquet/json/jsonl
-PHOTOS_DIR = DATA_DIR / "photos"                                                     # photos/<listing_id>/*.jpg
+PHOTOS_DIR = Path(os.getenv("PHOTOS_DIR", DATA_DIR / "photos"))                     # photos/<listing_id>/*.jpg
 
 # ---------------------------------------------------------------- артефакты (наши)
 ART_DIR = Path(os.getenv("KRISHA_ARTIFACTS", ROOT / "artifacts"))
@@ -61,15 +60,61 @@ TEXT_EMBED_KEY = os.getenv("EMBED_API_KEY")
 CHAT_MODEL = os.getenv("ALEM_CHAT_MODEL", "alemllm")
 CHAT_URL = os.getenv("ALEM_URL")
 CHAT_KEY = os.getenv("ALEM_API_KEY")
-CHAT_TEMPERATURE = float(os.getenv("CHAT_TEMPERATURE", 0.2))
-CHAT_MAX_TOKENS = int(os.getenv("CHAT_MAX_TOKENS", 400))
+# Параметры генерации подобраны экспериментом (ab_generation.py, EVALS.md раздел 3):
+#   temperature 0 — достоверность на 0 / 0.3 / 0.7 одинаковая, а 0 даёт воспроизводимость;
+#   top_p 1.0    — при temperature 0 декодирование жадное и top_p ни на что не влияет;
+#   max_tokens 800 — при 400 обрывалась половина ответов по выдаче (русский текст у alemllm
+#                  ~1.7 символа на токен), при 800 — ни одного. Это потолок, а не расход:
+#                  средний ответ 190–290 токенов.
+CHAT_TEMPERATURE = float(os.getenv("CHAT_TEMPERATURE", 0.0))
+CHAT_TOP_P = float(os.getenv("CHAT_TOP_P", 1.0))
+CHAT_MAX_TOKENS = int(os.getenv("CHAT_MAX_TOKENS", 800))
+
+# ---------------------------------------------------------------- шлюз LLM (llm.py)
+# Цепочка провайдеров: первый доступный отвечает, остальные — фолбэк. Порядок выбран
+# A/B-экспериментом ALEM против Gemini (ab_models.py, EVALS.md раздел 6).
+LLM_CHAIN = [p.strip() for p in os.getenv("LLM_CHAIN", "gemini,alem").split(",") if p.strip()]
+GEMINI_KEY = os.getenv("GEMINI_API_KEY")            # ключ Vertex AI (express mode)
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+# У Gemini 3.x рассуждения (thinking) включены по умолчанию и съедают max_output_tokens:
+# при лимите 400 модель тратила 382 токена на мысли и обрывала ответ. Уровень подобран
+# экспериментом (ab_models.py, EVALS.md раздел 6): minimal — 100% точных разборов,
+# low не лучше, но в 2.5–4 раза дороже и медленнее, medium хуже (додумывает «центр»).
+GEMINI_THINKING = os.getenv("GEMINI_THINKING", "minimal")
+# Судья в evals: согласие с разметкой у ALEM и Gemini одинаковое (каппа 0.63), ALEM бесплатный.
+JUDGE_CHAIN = [p.strip() for p in os.getenv("JUDGE_CHAIN", "alem,gemini").split(",") if p.strip()]
+GEMINI_TTS_MODEL = os.getenv("GEMINI_TTS_MODEL", "gemini-2.5-flash-lite-preview-tts")
+GEMINI_TTS_VOICE = os.getenv("GEMINI_TTS_VOICE", "Kore")
+LLM_TIMEOUT_S = float(os.getenv("LLM_TIMEOUT_S", 30))
+# Дневной бюджет на платные модели. Превышен — шлюз переходит на бесплатный ALEM.
+LLM_DAILY_BUDGET_USD = float(os.getenv("LLM_DAILY_BUDGET_USD", 3.0))
+LLM_CACHE = os.getenv("LLM_CACHE", "1") == "1"
+# 0.94 — минимальный порог без ложных попаданий на «светлая/тёмная кухня» (eval_semantic_cache.py)
+SEMANTIC_CACHE_THRESHOLD = float(os.getenv("SEMANTIC_CACHE_THRESHOLD", 0.94))
+
+# ---------------------------------------------------------------- рабочие данные сервиса
+# Кэш, учёт расходов, пользователи, отзывы. Не в git: это состояние, а не код.
+VAR_DIR = Path(os.getenv("BAGA_VAR", ROOT / "var"))
+VAR_DIR.mkdir(parents=True, exist_ok=True)
+DB_PATH = VAR_DIR / "baga.sqlite"
+USERS_PATH = Path(os.getenv("BAGA_USERS", VAR_DIR / "users.json"))
 
 # ---------------------------------------------------------------- поиск
 RRF_K = 60               # слияние рейтингов «по фото» и «по описанию», как в медицинском RAG
 SEED = 0
 
 
+# torch нужен только для векторизации (embed.py, rooms.py). Оценке цены, MCP-серверу и CI
+# он не нужен, а весит ~800 МБ — поэтому импорт необязательный.
+try:
+    import torch
+except ImportError:
+    torch = None
+
+
 def _device():
+    if torch is None:
+        return "cpu"
     if torch.cuda.is_available():
         return "cuda"
     if torch.backends.mps.is_available():
@@ -78,4 +123,4 @@ def _device():
 
 
 DEVICE = _device()
-DTYPE = torch.float16 if DEVICE == "cuda" else torch.float32
+DTYPE = None if torch is None else (torch.float16 if DEVICE == "cuda" else torch.float32)
