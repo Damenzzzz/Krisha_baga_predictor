@@ -1,0 +1,59 @@
+# ---------------------------------------------------------------- секреты
+# Репозиторий публичный: ключи только в .env, в git — шаблоны .env.example
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+var/users.json
+**/var/users.json
+
+# ---------------------------------------------------------------- данные парсера
+# Сырые страницы, SQLite, фото (6 ГБ), прокси, бэкапы, логи — не код и тяжёлые
+KrishaParser/data/
+KrishaParser/logs/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.log
+
+# ---------------------------------------------------------------- baga-ai
+# фото — ссылка на KrishaParser/data/photos; сырой выгруз — пересобирается парсером
+baga-ai/data/
+# рабочее состояние сервиса: кэш LLM, учёт расходов, отзывы, пользователи
+baga-ai/var/
+# индексы Qdrant собираются из эмбеддингов: python qdrant_store.py ingest
+baga-ai/artifacts/qdrant/
+baga-ai/artifacts/qdrant_server/
+# промежуточные шарды векторизации и склеенная матрица (в git — части photo_emb.part*.npy)
+baga-ai/artifacts/emb_shards/
+baga-ai/artifacts/photo_emb.npy
+# DINOv3 для поиска дублей (50 МБ): нужен только для пересчёта, результат — listing_dupes.parquet
+baga-ai/artifacts/dino_emb.npy
+catboost_info/
+
+# ---------------------------------------------------------------- инструменты
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.DS_Store
+Thumbs.db
+.claude/worktrees/
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+**/.claude/worktrees/
+**/.claude/settings.local.json
+**/.claude/scheduled_tasks.lock
+
+# личные черновики
+meow.md
+mew.ipynb

@@ -1,0 +1,1 @@
+{"model": "google/siglip2-base-patch16-224", "views": ["pad"], "clahe": false, "n": 72963, "paths_hash": "90202c43d542f69318635f69004b6dbab17e560d"}

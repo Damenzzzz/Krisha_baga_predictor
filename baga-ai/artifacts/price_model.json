@@ -1,0 +1,63 @@
+{
+  "features": [
+    "area",
+    "rooms",
+    "floor",
+    "floors_total",
+    "floor_rel",
+    "is_first_floor",
+    "is_last_floor",
+    "kitchen_area",
+    "area_per_room",
+    "photos_count",
+    "desc_len",
+    "lat",
+    "lon",
+    "kitchen_area_txt",
+    "living_area_txt",
+    "ceiling",
+    "year_txt",
+    "furnished",
+    "no_furniture",
+    "appliances",
+    "internet",
+    "deposit",
+    "kids_pets_ok",
+    "new_building",
+    "renovation",
+    "parking",
+    "security",
+    "separate_bath",
+    "combined_bath",
+    "city",
+    "district",
+    "mkr",
+    "street",
+    "cross_street",
+    "condition",
+    "bathroom"
+  ],
+  "cat_features": [
+    "city",
+    "district",
+    "mkr",
+    "street",
+    "cross_street",
+    "condition",
+    "bathroom"
+  ],
+  "quantiles": [
+    0.1,
+    0.5,
+    0.9
+  ],
+  "conformal_q": 0.0738221086754495,
+  "target": "log(price), ₸ в месяц",
+  "metrics_oof": {
+    "MAE, ₸": 85066,
+    "MAPE, %": 16.4,
+    "покрытие 10-90, %": 81.1,
+    "ширина, % от цены": 52
+  },
+  "n_train": 7476
+}
