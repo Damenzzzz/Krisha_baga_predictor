@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Вход — Baga</title>
+  <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Unbounded:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <style>
+    .login { min-height: calc(100vh - 68px); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .login-side { position: relative; background: var(--ink); color: var(--glacier); padding: 64px var(--gutter); display: flex; flex-direction: column; justify-content: flex-end; gap: 16px; overflow: hidden; }
+    .login-side h1 { font-size: var(--fs-2xl); max-width: 14ch; position: relative; }
+    .login-side p { color: var(--ice); max-width: 40ch; position: relative; }
+    .login-side svg { position: absolute; left: 0; right: 0; top: 18%; width: 100%; height: 55%; }
+    .login-main { display: flex; align-items: center; justify-content: center; padding: 48px var(--gutter); }
+    .login-box { width: min(100%, 400px); display: flex; flex-direction: column; gap: 18px; }
+    .switch { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--paper); box-shadow: inset 0 0 0 1px var(--mist); }
+    .switch button { flex: 1; border: 0; background: none; padding: 10px; border-radius: 999px; cursor: pointer; color: var(--slope); }
+    .switch button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+    form { display: flex; flex-direction: column; gap: 14px; }
+    .err { color: var(--apple); min-height: 1.4em; font-size: var(--fs-s); }
+    @media (max-width: 820px) { .login { grid-template-columns: 1fr; } .login-side { min-height: 260px; padding-top: 40px; } }
+  </style>
+</head>
+<body>
+<header class="nav"></header>
+<main class="login">
+  <aside class="login-side">
+    <svg viewBox="0 0 600 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <path d="M0 300V190l80-40 60 30 90-90 60 50 50-30 110 100 70-40 80 60V300Z" fill="#33415C"/>
+      <path d="m230 90 22 28-22 12-18-14Z" fill="#EEF1F4" opacity=".85"/>
+      <path d="M0 300v-60l110-20 90 24 120-44 100 30 90-26 90 30V300Z" fill="#27324A"/>
+      <circle cx="470" cy="70" r="14" fill="#C73E2E"/>
+    </svg>
+    <h1>Ассистент, голос и разбор цены</h1>
+    <p>Аккаунт нужен, чтобы пользоваться языковой моделью: она разбирает запрос, объясняет цену и отвечает голосом. Поиск по описанию и по фото работает и без него.</p>
+  </aside>
+  <section class="login-main">
+    <div class="login-box">
+      <div class="switch" role="group" aria-label="Вход или регистрация">
+        <button type="button" data-m="login" aria-pressed="true">Вход</button>
+        <button type="button" data-m="register" aria-pressed="false">Регистрация</button>
+      </div>
+      <form id="auth">
+        <label class="field">Логин <input class="input" name="username" autocomplete="username" required minlength="3" maxlength="32"></label>
+        <label class="field">Пароль <input class="input" name="password" type="password" autocomplete="current-password" required minlength="8"></label>
+        <p class="err" role="alert"></p>
+        <button class="btn" type="submit">Войти</button>
+      </form>
+    </div>
+  </section>
+</main>
+<script type="module">
+  import { api, me, nav } from "/static/js/common.js";
+  nav("login");
+  const form = document.getElementById("auth"), err = form.querySelector(".err"), submit = form.querySelector("button");
+  let mode = "login";
+  const next = new URLSearchParams(location.search).get("next") || "/app";
+  me().then((m) => {
+    if (m.user) location.replace(next);
+    if (!m.signup) document.querySelector('[data-m="register"]').hidden = true;
+  });
+  document.querySelector(".switch").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-m]");
+    if (!b) return;
+    mode = b.dataset.m;
+    document.querySelectorAll(".switch button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    submit.textContent = mode === "login" ? "Войти" : "Создать аккаунт";
+    form.password.autocomplete = mode === "login" ? "current-password" : "new-password";
+    err.textContent = "";
+  });
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    submit.disabled = true; err.textContent = "";
+    try {
+      await api(`/api/auth/${mode}`, { method: "POST", body: { username: form.username.value, password: form.password.value } });
+      location.replace(next.startsWith("/") ? next : "/app");
+    } catch (x) { err.textContent = x.message; submit.disabled = false; }
+  });
+</script>
+</body>
+</html>

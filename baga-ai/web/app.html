@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Поиск — Baga</title>
+  <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Unbounded:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<header class="nav"></header>
+
+<main class="wrap app">
+  <div class="modes" role="tablist" aria-label="Режим поиска">
+    <button role="tab" id="t-assistant" aria-controls="p-assistant" data-mode="assistant">Ассистент</button>
+    <button role="tab" id="t-describe" aria-controls="p-describe" data-mode="describe">По описанию</button>
+    <button role="tab" id="t-photo" aria-controls="p-photo" data-mode="photo">По фото</button>
+    <button role="tab" id="t-price" aria-controls="p-price" data-mode="price">Проверить цену</button>
+  </div>
+
+  <!-- ассистент -->
+  <section class="panel" id="p-assistant" role="tabpanel" aria-labelledby="t-assistant" hidden>
+    <form class="ask" id="ask-form">
+      <label class="sr" for="ask-q">Опишите квартиру</label>
+      <input class="input big" id="ask-q" maxlength="500" autocomplete="off"
+             placeholder="двушка в Бостандыке до 400 тысяч, светлая кухня, не первый этаж">
+      <button class="mic" type="button" id="mic" aria-label="Сказать голосом" title="Сказать голосом">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <button class="btn" type="submit">Найти</button>
+    </form>
+    <p class="hint small muted">Пишите как другу: комнаты, район, бюджет и как должна выглядеть квартира. Условия, которых вы не называли, ассистент уточнит.</p>
+    <div class="locked" hidden>
+      <h2>Ассистент доступен после входа</h2>
+      <p class="muted">Он разбирает запрос языковой моделью, а это стоит денег, поэтому нужен аккаунт. Поиск по описанию и по фото работает без входа.</p>
+      <p><a class="btn" href="/login?next=/app">Войти или создать аккаунт</a></p>
+    </div>
+    <div id="assistant-out" aria-live="polite"></div>
+  </section>
+
+  <!-- по описанию -->
+  <section class="panel" id="p-describe" role="tabpanel" aria-labelledby="t-describe" hidden>
+    <form class="ask" id="desc-form">
+      <label class="sr" for="desc-q">Как должна выглядеть квартира</label>
+      <input class="input big" id="desc-q" maxlength="500" autocomplete="off"
+             placeholder="светлая кухня в скандинавском стиле, белые фасады">
+      <button class="btn" type="submit">Найти</button>
+    </form>
+    <details class="filters" id="desc-filters">
+      <summary>Условия <span class="filters-sum muted"></span></summary>
+      <div class="filters-body">
+        <label class="field">Город <select class="input" name="city"><option value="">любой</option></select></label>
+        <fieldset class="field rooms"><legend>Комнат</legend><div class="toggles" data-name="rooms"></div></fieldset>
+        <label class="field">Цена до, ₸ <input class="input" name="price_max" type="number" min="0" step="10000" placeholder="например, 400000"></label>
+        <label class="field">Площадь от, м² <input class="input" name="area_min" type="number" min="0" step="5"></label>
+        <fieldset class="field districts"><legend>Районы</legend><div class="toggles" data-name="districts"></div></fieldset>
+        <fieldset class="field"><legend>Искать по фото комнат</legend><div class="toggles" data-name="photo_rooms"></div></fieldset>
+      </div>
+    </details>
+    <div id="describe-out" aria-live="polite"></div>
+  </section>
+
+  <!-- по фото -->
+  <section class="panel" id="p-photo" role="tabpanel" aria-labelledby="t-photo" hidden>
+    <label class="drop" id="drop">
+      <input type="file" id="photo-files" accept="image/jpeg,image/png,image/webp" multiple class="sr">
+      <span class="drop-title">Перетащите фото интерьера или выберите файлы</span>
+      <span class="small muted">До 6 фото: например, кухню из Pinterest и спальню, как у друзей. Каждое ищется среди своих комнат.</span>
+    </label>
+    <div class="thumbs" id="thumbs"></div>
+    <form class="photo-opts" id="photo-form">
+      <label class="field">Город <select class="input" name="city"><option value="">любой</option></select></label>
+      <label class="field">Цена до, ₸ <input class="input" name="price_max" type="number" min="0" step="10000"></label>
+      <button class="btn" type="submit" id="photo-go" disabled>Найти похожие квартиры</button>
+    </form>
+    <div id="photo-out" aria-live="polite"></div>
+  </section>
+
+  <!-- цена -->
+  <section class="panel" id="p-price" role="tabpanel" aria-labelledby="t-price" hidden>
+    <div class="price-forms">
+      <form id="price-link" class="ask">
+        <label class="sr" for="price-url">Ссылка на объявление</label>
+        <input class="input big" id="price-url" placeholder="https://krisha.kz/a/show/1014955701" autocomplete="off">
+        <button class="btn" type="submit">Проверить цену</button>
+      </form>
+      <details class="filters" id="price-manual">
+        <summary>Квартиры нет на krisha или нет в базе? Введите характеристики</summary>
+        <form class="filters-body" id="price-form">
+          <label class="field">Город <select class="input" name="city" required></select></label>
+          <label class="field">Район <select class="input" name="district"><option value="">не знаю</option></select></label>
+          <label class="field">Комнат <input class="input" name="rooms" type="number" min="1" max="8" required></label>
+          <label class="field">Площадь, м² <input class="input" name="area" type="number" min="10" max="500" required></label>
+          <label class="field">Этаж <input class="input" name="floor" type="number" min="1" max="60"></label>
+          <label class="field">Этажей в доме <input class="input" name="floors_total" type="number" min="1" max="60"></label>
+          <label class="field">Цена в объявлении, ₸ <input class="input" name="price" type="number" min="10000" step="5000"></label>
+          <div class="field"><span>&nbsp;</span><button class="btn" type="submit">Оценить</button></div>
+        </form>
+      </details>
+    </div>
+    <div id="price-out" aria-live="polite"></div>
+  </section>
+
+  <div class="grid results" id="results"></div>
+</main>
+
+<script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

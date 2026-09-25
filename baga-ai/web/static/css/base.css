@@ -1,0 +1,147 @@
+/* Baga AI — общие токены и компоненты.
+   Палитра «Алатау»: ледниковый фон, чернила вечерних гор, яблочный красный (Алма-Ата —
+   «отец яблок») для «дороже похожих», зелёный листа — для «дешевле». */
+:root {
+  --glacier: #EEF1F4;
+  --paper: #FAFBFC;
+  --ink: #18202B;
+  --slope: #33415C;
+  --ice: #9FB7C9;
+  --mist: #D5DEE6;
+  --apple: #C73E2E;
+  --leaf: #3C8C5A;
+  --band: #C3D2DF;
+  --muted: #5F6D80;
+
+  --display: "Unbounded", "Onest", system-ui, sans-serif;
+  --text: "Onest", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* модульная шкала ≈1.25 от 17px */
+  --fs-xs: 0.8125rem;
+  --fs-s: 0.9375rem;
+  --fs-m: 1.0625rem;
+  --fs-l: 1.3125rem;
+  --fs-xl: 1.75rem;
+  --fs-2xl: clamp(2rem, 3.2vw, 2.75rem);
+  --fs-hero: clamp(2.35rem, 5.2vw, 4.25rem);
+
+  --r-s: 8px;
+  --r-m: 14px;
+  --r-l: 22px;
+  --gutter: clamp(16px, 4vw, 48px);
+  --max: 1240px;
+  --ease: cubic-bezier(.2, .7, .2, 1);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--glacier);
+  color: var(--ink);
+  font: 400 var(--fs-m)/1.55 var(--text);
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  -webkit-font-smoothing: antialiased;
+}
+img { display: block; max-width: 100%; }
+[hidden] { display: none !important; }     /* иначе display:flex у панелей перебивает атрибут hidden */
+a { color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2.5px solid var(--slope); outline-offset: 3px; border-radius: 4px; }
+.wrap { width: min(100% - 2 * var(--gutter), var(--max)); margin-inline: auto; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+h1, h2, h3 { font-family: var(--display); font-weight: 600; letter-spacing: -0.02em; margin: 0; }
+h1 { font-size: var(--fs-hero); line-height: 1.02; }
+h2 { font-size: var(--fs-2xl); line-height: 1.1; }
+h3 { font-size: var(--fs-l); line-height: 1.2; font-weight: 500; }
+p { margin: 0; max-width: 66ch; }
+.lede { font-size: var(--fs-l); line-height: 1.5; color: var(--slope); max-width: 38ch; }
+.muted { color: var(--muted); }
+.small { font-size: var(--fs-s); }
+
+/* --------------------------------------------------------------- навигация */
+.nav { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--glacier) 88%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px); border-bottom: 1px solid transparent; transition: border-color .3s; }
+.nav.scrolled { border-bottom-color: var(--mist); }
+.nav .wrap { display: flex; align-items: center; gap: 28px; height: 68px; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 600 1.125rem/1 var(--display); }
+.brand svg { width: 30px; height: 30px; }
+.nav-links { display: flex; gap: 24px; margin-left: auto; align-items: center; }
+.nav-links a { text-decoration: none; color: var(--slope); font-size: var(--fs-s); }
+.nav-links a:hover, .nav-links a[aria-current="page"] { color: var(--ink); }
+.nav-links a.btn, .nav-links a.btn:hover { color: var(--paper); }
+.nav-links a[aria-current="page"] { text-decoration: underline; text-underline-offset: 6px; text-decoration-thickness: 2px; }
+@media (max-width: 720px) {
+  .nav-links a.hide-m { display: none; }
+  .nav .wrap { gap: 14px; }
+}
+
+/* --------------------------------------------------------------- кнопки и поля */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; cursor: pointer;
+  padding: 0 22px; height: 48px; border-radius: 999px; background: var(--ink); color: var(--paper);
+  font-weight: 500; text-decoration: none; white-space: nowrap; transition: transform .15s var(--ease), background .2s; }
+.btn:hover { background: var(--slope); }
+.btn:active { transform: scale(.97); }
+.btn[disabled] { opacity: .5; cursor: progress; }
+.btn.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
+.btn.ghost:hover { background: var(--ink); color: var(--paper); }
+.btn.quiet { background: transparent; color: var(--slope); height: 38px; padding: 0 14px; box-shadow: inset 0 0 0 1px var(--mist); }
+.btn.quiet:hover { color: var(--ink); box-shadow: inset 0 0 0 1px var(--ice); background: var(--paper); }
+.btn.small { height: 38px; padding: 0 16px; font-size: var(--fs-s); }
+
+.field { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-s); color: var(--slope); }
+.input, select.input { height: 50px; padding: 0 16px; border-radius: var(--r-m); border: 1.5px solid var(--mist);
+  background: var(--paper); color: var(--ink); transition: border-color .2s; min-width: 0; }
+.input:focus { border-color: var(--slope); outline: none; }
+
+/* --------------------------------------------------------------- коридор цены
+   Серая полоса — p10…p90 похожих объявлений (80% похожих сдаются в этих пределах),
+   штрих — медиана, точка — цена этого объявления. Цвет точки — вердикт. */
+.band { position: relative; height: 26px; }
+.band .track { position: absolute; left: 0; right: 0; top: 12px; height: 2px; background: var(--mist); }
+.band .range { position: absolute; top: 7px; height: 12px; border-radius: 6px; background: var(--band); }
+.band .median { position: absolute; top: 4px; width: 2px; height: 18px; background: var(--slope); border-radius: 1px; }
+.band .dot { position: absolute; top: 5px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%;
+  background: var(--ink); box-shadow: 0 0 0 3px var(--paper); transition: left .9s var(--ease), background .3s; }
+.band .dot.above { background: var(--apple); }
+.band .dot.below { background: var(--leaf); }
+.band-legend { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; font-size: var(--fs-xs);
+  color: var(--muted); margin-top: 2px; }
+.band-legend span { white-space: nowrap; }
+.verdict { font-size: var(--fs-s); font-weight: 500; }
+.verdict.above { color: var(--apple); }
+.verdict.below { color: var(--leaf); }
+.verdict.within { color: var(--slope); }
+
+/* --------------------------------------------------------------- карточка объявления */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 32px 24px; }
+.card { display: flex; flex-direction: column; gap: 12px; }
+.card .ph { position: relative; aspect-ratio: 4 / 3; border-radius: var(--r-l); overflow: hidden; background: var(--mist); }
+.card .ph img { width: 100%; height: 100%; object-fit: cover; }
+.card .ph .tag { position: absolute; left: 12px; bottom: 12px; background: var(--paper); color: var(--ink);
+  font-size: var(--fs-xs); padding: 5px 10px; border-radius: 999px; }
+.card .price { font: 600 var(--fs-xl)/1 var(--display); letter-spacing: -0.02em; }
+.card .price small { font: 400 var(--fs-s) var(--text); color: var(--muted); letter-spacing: 0; }
+.card .meta { color: var(--slope); font-size: var(--fs-s); }
+.card .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.card .actions .btn { font-size: var(--fs-s); padding: 0 14px; }
+.card .why { font-size: var(--fs-s); line-height: 1.55; color: var(--slope); border-left: 2px solid var(--ice);
+  padding: 2px 0 2px 14px; overflow: hidden; }
+.card.flash .ph { box-shadow: 0 0 0 3px var(--slope); transition: box-shadow .3s; }
+
+/* --------------------------------------------------------------- прочее */
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); opacity: 0; z-index: 50;
+  background: var(--ink); color: var(--paper); padding: 12px 20px; border-radius: 999px; font-size: var(--fs-s);
+  transition: opacity .25s, transform .25s var(--ease); pointer-events: none; max-width: calc(100% - 32px); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.skeleton { background: linear-gradient(90deg, var(--mist), #e6ecf1, var(--mist)); background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+footer.site { border-top: 1px solid var(--mist); margin-top: 96px; padding: 36px 0 48px; color: var(--muted); font-size: var(--fs-s); }
+footer.site .wrap { display: flex; gap: 24px; flex-wrap: wrap; justify-content: space-between; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important; scroll-behavior: auto !important; }
+}

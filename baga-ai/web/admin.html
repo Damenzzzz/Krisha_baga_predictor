@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Панель — Baga</title>
+  <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Unbounded:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <style>
+    .admin { padding: 32px 0 40px; display: flex; flex-direction: column; gap: 36px; }
+    .admin-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+    .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+    .kpi { background: var(--paper); border-radius: var(--r-l); padding: 20px 22px; display: flex; flex-direction: column; gap: 8px; }
+    .kpi b { font: 600 var(--fs-xl)/1 var(--display); letter-spacing: -0.02em; }
+    .kpi span { color: var(--muted); font-size: var(--fs-s); }
+    .meter { height: 8px; border-radius: 4px; background: var(--mist); overflow: hidden; }
+    .meter i { display: block; height: 100%; background: var(--ink); }
+    .meter i.hot { background: var(--apple); }
+    .box { background: var(--paper); border-radius: var(--r-l); padding: 22px 24px; overflow-x: auto; }
+    .box h2 { font-size: var(--fs-l); margin-bottom: 14px; }
+    table { width: 100%; border-collapse: collapse; font-size: var(--fs-s); }
+    th { text-align: left; font-weight: 500; color: var(--muted); padding: 8px 12px 8px 0; border-bottom: 1px solid var(--mist); white-space: nowrap; }
+    td { padding: 9px 12px 9px 0; border-bottom: 1px solid var(--mist); vertical-align: top; }
+    td.n { text-align: right; font-variant-numeric: tabular-nums; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: var(--fs-xs); background: var(--glacier); }
+    .pill.bad { background: #F6DEDA; color: var(--apple); }
+    .pill.ok { background: #DDEEE3; color: var(--leaf); }
+    .bars { display: flex; align-items: flex-end; gap: 10px; height: 120px; }
+    .bars div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--muted); }
+    .bars i { width: 100%; max-width: 46px; background: var(--slope); border-radius: 6px 6px 0 0; min-height: 2px; }
+    @media (max-width: 900px) { .kpis { grid-template-columns: 1fr 1fr; } .two { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<header class="nav"></header>
+<main class="wrap admin" id="admin">
+  <div class="status"><span class="spinner" aria-hidden="true"></span>Загружаю данные…</div>
+</main>
+<script type="module">
+  import { api, esc, me, nav } from "/static/js/common.js";
+  nav("admin");
+  const root = document.getElementById("admin");
+  const usd = (x) => "$" + Number(x || 0).toFixed(x >= 1 ? 2 : 4);
+  const table = (rows, cols) => rows.length ? `<table><thead><tr>${cols.map(([, h]) => `<th>${h}</th>`).join("")}</tr></thead>
+    <tbody>${rows.map((r) => `<tr>${cols.map(([k, , f]) => `<td class="${typeof r[k] === "number" ? "n" : ""}">${f ? f(r[k], r) : esc(r[k] ?? "—")}</td>`).join("")}</tr>`).join("")}</tbody></table>`
+    : `<p class="muted small">Пока пусто.</p>`;
+
+  async function load() {
+    const m = await me();
+    if (m.role !== "admin") { location.replace("/login?next=/admin"); return; }
+    const d = await api("/api/admin/summary");
+    const h = d.health, spent = h.spent_today_usd, share = Math.min(1, spent / (h.budget_usd || 1));
+    const up = d.feedback.reduce((s, f) => s + (f.up || 0), 0), all = d.feedback.reduce((s, f) => s + (f.n || 0), 0);
+    const maxDay = Math.max(...d.by_day.map((x) => x.cost || 0), 0.0001);
+    root.innerHTML = `
+      <div class="admin-head"><h1 style="font-size:var(--fs-2xl)">Панель</h1>
+        ${d.langfuse ? `<a class="btn ghost small" href="${esc(d.langfuse)}" target="_blank" rel="noopener">Трейсы в Langfuse</a>` : ""}</div>
+      <section class="kpis" aria-label="Сегодня">
+        <div class="kpi"><span>Потрачено на модели сегодня</span><b>${usd(spent)}</b>
+          <div class="meter" title="из дневного бюджета ${usd(h.budget_usd)}"><i class="${share > .8 ? "hot" : ""}" style="width:${share * 100}%"></i></div>
+          <span>бюджет ${usd(h.budget_usd)}; после него отвечает бесплатная ALEM</span></div>
+        <div class="kpi"><span>Обращений к моделям</span><b>${d.today.calls}</b><span>${d.today.cached} из кэша</span></div>
+        <div class="kpi"><span>Ошибок провайдеров</span><b>${d.today.errors}</b><span>каждая ушла на фолбэк</span></div>
+        <div class="kpi"><span>Отзывы</span><b>${all ? Math.round((100 * up) / all) + "%" : "—"}</b><span>${all ? `положительных из ${all}` : "пока нет"}</span></div>
+      </section>
+      <div class="two">
+        <section class="box"><h2>Цепочка моделей</h2>${table(Object.entries(h.providers).map(([n, p], i) => ({ n: `${i + 1}. ${n}`, ...p })), [
+          ["n", "Провайдер"], ["model", "Модель"],
+          ["configured", "Ключ", (v) => v ? `<span class="pill ok">есть</span>` : `<span class="pill bad">нет</span>`],
+          ["breaker_open", "Состояние", (v) => v ? `<span class="pill bad">выключен на минуту</span>` : `<span class="pill ok">работает</span>`]])}</section>
+        <section class="box"><h2>Расход по дням</h2>
+          <div class="bars">${d.by_day.map((x) => `<div><span>${usd(x.cost)}</span><i style="height:${(80 * (x.cost || 0)) / maxDay}px"></i><span>${x.day.slice(5)}</span></div>`).join("") || '<p class="muted small">Пока пусто.</p>'}</div>
+          <p class="small muted" style="margin-top:12px">Смысловой кэш разбора: ${d.cache.entries} запросов, ${d.cache.hits} повторов без обращения к модели.</p></section>
+      </div>
+      <section class="box"><h2>Расход по задачам за неделю</h2>${table(d.usage, [["day", "День"], ["provider", "Провайдер"], ["task", "Задача"],
+        ["calls", "Вызовов"], ["cached", "Из кэша"], ["out_tokens", "Токенов ответа"], ["cost_usd", "Стоимость", (v) => usd(v)], ["avg_latency_s", "Среднее время, с"]])}</section>
+      <section class="box"><h2>Последние отзывы</h2>${table(d.recent_feedback, [["time", "Когда"], ["user_id", "Кто"], ["channel", "Откуда"], ["kind", "Что"],
+        ["value", "Оценка", (v) => (v ? "👍" : "👎")], ["query", "Запрос"]])}</section>
+      <section class="box"><h2>Пользователи</h2>${table(d.users, [["username", "Логин"], ["role", "Роль"], ["created", "Создан"]])}</section>`;
+  }
+  load().catch((e) => (root.innerHTML = `<p class="error">${esc(e.message)}</p>`));
+</script>
+</body>
+</html>

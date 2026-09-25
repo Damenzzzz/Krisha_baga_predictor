@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Baga — аренда в Алматы по виду ремонта</title>
+  <meta name="description" content="Опишите квартиру словами — Baga найдёт её среди 73 000 фото krisha.kz и покажет, дороже ли она похожих.">
+  <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Unbounded:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/home.css">
+</head>
+<body>
+<header class="nav"></header>
+
+<main>
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <h1>Аренда в&nbsp;Алматы по&nbsp;виду ремонта</h1>
+        <p class="lede">Напишите, какую квартиру хотите, как сказали бы другу. Baga найдёт её среди 73&nbsp;000 фотографий krisha.kz и&nbsp;покажет, дороже ли она похожих.</p>
+        <form class="hero-search" action="/app" method="get" role="search">
+          <label class="sr" for="hq">Что ищете</label>
+          <input class="input" id="hq" name="q" autocomplete="off"
+                 placeholder="двушка до 400 тысяч, светлая кухня">
+          <button class="btn" type="submit">Найти квартиру</button>
+        </form>
+        <p class="small muted hero-note">Или напишите боту в Telegram — <a href="https://t.me/krishaa_ai_bot">@krishaa_ai_bot</a>, можно голосом.</p>
+      </div>
+
+      <div class="demo" aria-label="Пример работы на настоящих объявлениях">
+        <div class="demo-query"><span class="demo-typed" aria-live="polite"></span><span class="caret" aria-hidden="true"></span></div>
+        <div class="demo-grid">
+          <div class="demo-tile skeleton"></div><div class="demo-tile skeleton"></div><div class="demo-tile skeleton"></div>
+          <div class="demo-tile skeleton"></div><div class="demo-tile skeleton"></div><div class="demo-tile skeleton"></div>
+        </div>
+        <div class="demo-key" aria-hidden="true"><span><i class="k-range"></i>за сколько сдают похожие</span>
+          <span><i class="k-dot"></i>эта квартира</span><span><i class="k-hot"></i>дороже похожих</span></div>
+        <div class="demo-foot small muted"><span class="demo-status">Ищем по фотографиям кухонь…</span>
+          <button class="btn quiet small demo-replay" type="button" hidden>Показать ещё раз</button></div>
+      </div>
+    </div>
+    <svg class="ridge" viewBox="0 0 1440 160" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M0 160V118l70-22 58 18 90-54 64 30 52-22 96-56 70 44 46-18 88 62 60-24 74 30 102-72 66 38 58-20 86 56 70-26 58 22 90-48 62 34 80-22V160Z" fill="#DDE5EC"/>
+      <path d="M0 160v-20l96-18 80 12 110-38 74 20 92-36 88 30 70-12 120 34 96-40 84 22 116-26 90 30 104-34 82 18 138-10V160Z" fill="#E6ECF1"/>
+    </svg>
+  </section>
+
+  <section class="section parse" id="parse">
+    <div class="wrap parse-grid">
+      <div>
+        <h2>Фильтры krisha не знают, что такое «светлая кухня»</h2>
+        <p class="muted">На сайте объявлений можно выбрать комнаты, цену и район. Как выглядит квартира, приходится выяснять, пролистывая сотни фото. Baga делит запрос на две части: то, что можно отфильтровать, и то, что нужно увидеть.</p>
+      </div>
+      <figure class="parse-demo" aria-label="Как разбирается запрос">
+        <p class="parse-q">
+          <mark data-k="rooms">двушка</mark> в <mark data-k="district">Бостандыке</mark>
+          <mark data-k="price">до 400 тысяч</mark>, <mark data-k="style" class="style">светлая кухня с белыми фасадами</mark>
+        </p>
+        <div class="parse-out">
+          <div class="parse-col">
+            <span class="parse-head">Фильтры</span>
+            <button type="button" class="chip" data-k="rooms">2 комнаты</button>
+            <button type="button" class="chip" data-k="district">Бостандыкский район</button>
+            <button type="button" class="chip" data-k="price">до 400 000 ₸</button>
+          </div>
+          <div class="parse-col">
+            <span class="parse-head">Ищем глазами</span>
+            <button type="button" class="chip style" data-k="style">фото кухонь, похожие на описание</button>
+          </div>
+        </div>
+        <figcaption class="small muted">Если модель что-то додумала сама — например, город, — она спросит, прежде чем искать.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="section price" id="price-band">
+    <div class="wrap price-grid">
+      <div>
+        <h2>Честная цена — это коридор, а не одна цифра</h2>
+        <p class="muted">Модель смотрит на похожие квартиры — тот же район, комнаты, площадь, этаж — и показывает, за сколько сдаются 80% из них. Одна «справедливая цена» обманывала бы: у двух одинаковых двушек ремонт может отличаться на полмиллиона.</p>
+        <p class="small muted honesty">Мы сравниваем с ценами объявлений, а не сделок. Поэтому говорим «дороже похожих», а не «вы переплачиваете».</p>
+      </div>
+      <div class="price-play">
+        <p class="price-case">Двушка, 55 м², Бостандыкский район</p>
+        <div class="price-now"><output id="price-out">420 000 ₸</output><span class="small muted"> в месяц</span></div>
+        <div id="price-band-slot"></div>
+        <label class="field price-slider">
+          <span>Подвигайте цену объявления</span>
+          <input type="range" id="price-range" min="220000" max="620000" step="10000" value="420000">
+        </label>
+      </div>
+    </div>
+  </section>
+
+  <section class="section how" id="how">
+    <div class="wrap">
+      <h2>Что происходит после «Найти»</h2>
+      <ol class="steps">
+        <li><h3>Разбор запроса</h3><p>Языковая модель отделяет условия от описания и не придумывает того, чего вы не говорили.</p></li>
+        <li><h3>Уточнение</h3><p>Если условие всё же появилось само — например, город, — ассистент спросит, искать ли с ним.</p></li>
+        <li><h3>Поиск по фото и тексту</h3><p>Описание сравнивается с 73 000 фотографий: кухни ищутся среди кухонь, спальни — среди спален.</p></li>
+        <li><h3>Сравнение с похожими</h3><p>Для каждой квартиры модель цены строит коридор по похожим объявлениям.</p></li>
+        <li><h3>Ответ со ссылками</h3><p>Короткий вывод, где каждое число и каждое объявление можно открыть и проверить.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="section where" id="where">
+    <div class="wrap where-grid">
+      <h2>Там, где удобно вам</h2>
+      <dl class="where-list">
+        <div><dt>Сайт</dt><dd>Ассистент, поиск по описанию, поиск по своему фото интерьера и проверка цены по ссылке. <a href="/app">Открыть поиск</a></dd></div>
+        <div><dt>Telegram</dt><dd>Пришлите запрос или ссылку на объявление krisha.kz — бот ответит и покажет варианты. <a href="https://t.me/krishaa_ai_bot">@krishaa_ai_bot</a></dd></div>
+        <div><dt>Голос</dt><dd>Нажмите на микрофон и скажите запрос; ответ можно послушать. Работает на сайте и в боте.</dd></div>
+        <div><dt>Claude и Cursor</dt><dd>MCP-сервер даёт ассистентам четыре инструмента: поиск, проверка цены, аналоги, карточка объявления.</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="section facts" id="facts">
+    <div class="wrap facts-grid">
+      <div>
+        <h2>Что мы проверили</h2>
+        <p class="muted">Каждая цифра получена на наших данных; как именно — описано в отчёте об оценке.</p>
+        <p><a href="https://github.com/Damenzzzz/Krisha_baga_predictor/blob/main/baga-ai/EVALS.md">Отчёт об оценке на GitHub</a></p>
+      </div>
+      <dl class="facts-list">
+        <div><dt>7 476</dt><dd>объявлений об аренде в Алматы и Каскелене, срез 21 сентября 2026</dd></div>
+        <div><dt>82%</dt><dd>квартир в первой пятёрке, где на фото видно то, что вы описали</dd></div>
+        <div><dt>16%</dt><dd>средняя ошибка оценки цены; рыночное правило «медиана за метр по району» ошибается на 22%</dd></div>
+        <div><dt>36 из 36</dt><dd>проверочных запросов разобраны без выдуманных условий, включая ловушки вроде «недорогая квартира в центре»</dd></div>
+        <div><dt>6 секунд</dt><dd>типичное время ответа ассистента</dd></div>
+      </dl>
+    </div>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <span>Baga — финальный проект nFactorial, 2026. Данные: krisha.kz.</span>
+    <a href="https://github.com/Damenzzzz/Krisha_baga_predictor">Код на GitHub</a>
+  </div>
+</footer>
+
+<script type="module" src="/static/js/home.js"></script>
+</body>
+</html>
