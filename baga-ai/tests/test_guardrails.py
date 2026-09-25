@@ -50,3 +50,16 @@ def test_other_city_in_answer_is_caught():
     """Реальный случай с прогона агента: выдача алматинская, а модель пишет «в Астане»."""
     r = check_output("Найдено несколько однокомнатных квартир в Астане [1015831012].", [], ["1015831012"])
     assert not r["ok"] and r["other_cities"] == ["астан"]
+
+
+def test_answer_may_repeat_numbers_from_user_query(monkeypatch):
+    """Регрессия: «до 600 тысяч» из запроса считалось выдуманной суммой, и хороший ответ
+    заменялся шаблоном (найдено на живом прогоне агента)."""
+    import explain
+    import llm
+    res = [{"listing_id": "1015807119", "photos": [], "price_check": {"p10": 500000, "p50": 550000, "p90": 620000},
+            "listing": {"price": 580000, "rooms": 3, "area": 90, "district": "медеуский р-н", "description": ""}}]
+    text = "В пределах вашего бюджета до 600 000 ₸ нашлась трёшка [1015807119] за 580 000 ₸."
+    monkeypatch.setattr(llm, "complete", lambda *a, **k: llm.LLMResult(text=text, finish_reason="stop",
+                                                                       provider="fake", model="fake"))
+    assert explain.answer_search("трешка в Медеуском до 600 тысяч", res) == text

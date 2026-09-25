@@ -43,6 +43,11 @@ PRICES = {
 # ОТВЕТА (как у ALEM), а у Gemini лимит общий на мысли и ответ.
 THINKING_RESERVE = {"minimal": 0, "low": 1024, "medium": 4096, "high": 8192}
 CACHE_TTL_S = 7 * 86400
+# Таймаут по задаче. У Gemini бывают хвостовые задержки: на замере разбор занял 14.7 с,
+# а один вызов через 26 с упал с 499 CANCELLED. Разбор короткий (p50 1.4 с) — ждать
+# дольше 10 с незачем, быстрее уйти на ALEM (2.4 с). Ответы длиннее — 20 с.
+TASK_TIMEOUT_S = {"parse_query": 10, "answer_search": 20, "explain_price": 20, "judge": 15,
+                  "stt": 30, "rerank": 30, "visual_judge": 60}
 BREAKER_FAILS, BREAKER_COOLDOWN_S = 3, 60.0
 
 
@@ -101,10 +106,11 @@ class _GeminiProvider:
                                         http_options=types.HttpOptions(timeout=int(C.LLM_TIMEOUT_S * 1000)))
         return self._client
 
-    def call(self, system, user, temperature, top_p, max_tokens, json_mode, thinking) -> LLMResult:
+    def call(self, system, user, temperature, top_p, max_tokens, json_mode, thinking, timeout_s=None) -> LLMResult:
         from google.genai import errors, types
         level = thinking or C.GEMINI_THINKING
         cfg = types.GenerateContentConfig(
+            http_options=types.HttpOptions(timeout=int((timeout_s or C.LLM_TIMEOUT_S) * 1000)),
             system_instruction=system or None, temperature=temperature, top_p=top_p,
             max_output_tokens=max_tokens + THINKING_RESERVE.get(level, 0),
             thinking_config=types.ThinkingConfig(thinking_level=level),
@@ -115,9 +121,11 @@ class _GeminiProvider:
             r = self.client().models.generate_content(model=self.model, contents=contents, config=cfg)
         except errors.APIError as e:
             code = getattr(e, "code", 0) or 0
-            raise ProviderError(f"gemini {code}: {str(e)[:200]}", transient=code in (408, 429) or code >= 500)
+            raise ProviderError(f"gemini {code}: {str(e)[:200]}", transient=code in (408, 429, 499) or code >= 500)
         except Exception as e:                       # таймаут, сеть
-            raise ProviderError(f"gemini: {type(e).__name__}: {str(e)[:200]}")
+            # на таймаут не повторяем тот же провайдер — сразу фолбэк: повтор удвоил бы ожидание
+            timeout = "timeout" in type(e).__name__.lower() or "timed out" in str(e).lower()
+            raise ProviderError(f"gemini: {type(e).__name__}: {str(e)[:200]}", transient=not timeout)
         cand = (r.candidates or [None])[0]
         fin = str(getattr(cand, "finish_reason", "") or "").upper()
         text = (r.text or "").strip() if cand is not None else ""
@@ -147,18 +155,20 @@ class _AlemProvider:
             self._client = OpenAI(api_key=C.CHAT_KEY, base_url=C.CHAT_URL, timeout=C.LLM_TIMEOUT_S, max_retries=0)
         return self._client
 
-    def call(self, system, user, temperature, top_p, max_tokens, json_mode, thinking) -> LLMResult:
+    def call(self, system, user, temperature, top_p, max_tokens, json_mode, thinking, timeout_s=None) -> LLMResult:
         import openai
         if not isinstance(user, str):
             raise ProviderError("alem: только текст (аудио и картинки — не к этой модели)", transient=False)
         msgs = ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": user}]
         t0 = time.time()
         try:
-            r = self.client().chat.completions.create(model=self.model, messages=msgs, temperature=temperature,
-                                                      top_p=top_p, max_tokens=max_tokens)
+            r = self.client().with_options(timeout=timeout_s or C.LLM_TIMEOUT_S).chat.completions.create(
+                model=self.model, messages=msgs, temperature=temperature, top_p=top_p, max_tokens=max_tokens)
         except openai.APIStatusError as e:
             raise ProviderError(f"alem {e.status_code}: {str(e)[:200]}",
                                 transient=e.status_code in (408, 429) or e.status_code >= 500)
+        except openai.APITimeoutError as e:
+            raise ProviderError(f"alem: таймаут {timeout_s or C.LLM_TIMEOUT_S} с", transient=False) from e
         except Exception as e:
             raise ProviderError(f"alem: {type(e).__name__}: {str(e)[:200]}")
         c = r.choices[0]
@@ -236,7 +246,7 @@ def _cache_key(system, user, params: dict, chain: list[str]) -> str:
 def complete(system: str, user, *, task: str, temperature: float | None = None, top_p: float | None = None,
              max_tokens: int | None = None, json_mode: bool = False, thinking: str | None = None,
              providers: list[str] | None = None, use_cache: bool | None = None,
-             user_id: str | None = None) -> LLMResult:
+             user_id: str | None = None, timeout_s: float | None = None) -> LLMResult:
     """Один ответ модели с фолбэком. providers — принудительный список (для A/B),
     по умолчанию LLM_CHAIN. user — строка или список частей (текст + аудио) для Gemini."""
     import store
@@ -246,6 +256,7 @@ def complete(system: str, user, *, task: str, temperature: float | None = None, 
     top_p = C.CHAT_TOP_P if top_p is None else top_p
     max_tokens = C.CHAT_MAX_TOKENS if max_tokens is None else max_tokens
     chain = providers or C.LLM_CHAIN
+    timeout_s = timeout_s or TASK_TIMEOUT_S.get(task, C.LLM_TIMEOUT_S)
     params = {"temperature": temperature, "top_p": top_p, "max_tokens": max_tokens, "json_mode": json_mode,
               "thinking": thinking or C.GEMINI_THINKING}
     cacheable = (C.LLM_CACHE if use_cache is None else use_cache) and temperature == 0 and isinstance(user, str)
@@ -275,12 +286,14 @@ def complete(system: str, user, *, task: str, temperature: float | None = None, 
                                     | ({"thinking": params["thinking"]} if name == "gemini" else {}),
                                     metadata={"provider": name, "attempt": attempt,
                                               "fallback_from": ", ".join(skipped) or None}) as obs:
+                t_call = time.time()
                 try:
-                    res = p.call(system, user, temperature, top_p, max_tokens, json_mode, thinking)
+                    res = p.call(system, user, temperature, top_p, max_tokens, json_mode, thinking, timeout_s)
                 except ProviderError as e:
                     obs.update(level="ERROR", status_message=str(e))
                     errors.append(str(e))
-                    store.log_call(task, name, p.model, ok=False, error=str(e), user_id=user_id)
+                    store.log_call(task, name, p.model, ok=False, error=str(e), user_id=user_id,
+                                   latency_s=round(time.time() - t_call, 3))
                     if e.transient and attempt == 1:
                         time.sleep(0.5)
                         continue

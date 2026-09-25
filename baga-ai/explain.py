@@ -187,7 +187,9 @@ def answer_search(query: str, results: list[dict], temperature: float | None = N
         _log_fallback("answer_search", e)
         return _template_search(results)
 
-    nums, ids = [], []
+    # числа из запроса пользователя («до 600 тысяч») модель вправе повторить — это не выдумка
+    from semantic_cache import _numbers
+    nums, ids = [float(n) for n in _numbers(query.lower())], []
     for r in results:
         pc = r.get("price_check") or {}
         nums += [r.get("listing", {}).get("price"), pc.get("p10"), pc.get("p50"), pc.get("p90")]

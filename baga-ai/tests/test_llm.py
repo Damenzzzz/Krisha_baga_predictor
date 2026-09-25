@@ -15,7 +15,7 @@ class Fake:
     def available(self):
         return True
 
-    def call(self, system, user, temperature, top_p, max_tokens, json_mode, thinking):
+    def call(self, system, user, temperature, top_p, max_tokens, json_mode, thinking, timeout_s=None):
         self.calls += 1
         if self.calls <= self.fail:
             raise llm.ProviderError(f"{self.name} 503", transient=self.transient)
