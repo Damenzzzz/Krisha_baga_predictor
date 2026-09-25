@@ -24,11 +24,14 @@ description: Проверяет, не завышена ли цена аренд�
 
 Все команды запускаются из корня проекта (`baga-ai`).
 
+Если подключён MCP-сервер `baga-ai` (`mcp_server.py`), вместо команд используй его инструменты —
+данные и модель те же: `check_rent_price`, `get_comparables`, `search_apartments`, `get_listing`.
+
 **Проверить цену объявления** (принимает id или ссылку krisha.kz):
 
 ```bash
-python scripts/check_listing.py price 1014955701
-python scripts/check_listing.py price https://krisha.kz/a/show/1014955701
+python skills/rent-price-check/scripts/check_listing.py price 1014955701
+python skills/rent-price-check/scripts/check_listing.py price https://krisha.kz/a/show/1014955701
 ```
 
 Вернёт JSON: диапазон похожих (p10/p50/p90), вердикт, надёжность оценки,
@@ -37,13 +40,13 @@ python scripts/check_listing.py price https://krisha.kz/a/show/1014955701
 **Найти квартиры по описанию ремонта:**
 
 ```bash
-python scripts/check_listing.py search "светлая кухня в скандинавском стиле" --city алматы --rooms 2 --price-max 400000
+python skills/rent-price-check/scripts/check_listing.py search "светлая кухня в скандинавском стиле" --city алматы --rooms 2 --price-max 400000
 ```
 
 **Оценить квартиру, которой нет в базе** (например, с другого сайта):
 
 ```bash
-python scripts/check_listing.py price --area 60 --rooms 2 --city алматы --district "бостандыкский р-н" --floor 5 --floors-total 12 --price 550000
+python skills/rent-price-check/scripts/check_listing.py price --area 60 --rooms 2 --city алматы --district "бостандыкский р-н" --floor 5 --floors-total 12 --price 550000
 ```
 
 ## Как отвечать пользователю

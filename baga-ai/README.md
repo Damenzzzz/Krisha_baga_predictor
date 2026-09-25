@@ -163,11 +163,14 @@ Kaggle, а используются локально. Целостность с�
 | Загрузка векторов в Qdrant | готова | реальные векторы, 7 199 объявлений |
 | Разбор запроса через LLM (`query_parser.py`) | готов | не придумывает условий, есть фолбэк без LLM |
 | Агент LangGraph (ветвление, цикл, подтверждение) | готов | проверен на 3 сценариях, работает в интерфейсе |
-| MCP-сервер | делает второй участник | обёртка над `api.py` |
+| MCP-сервер (`mcp_server.py`) | готов | 4 инструмента, проверен MCP-клиентом по stdio и в тестах |
+| Guardrails (`guardrails.py`) | готов | injection recall 95%, 0 ложных блокировок на 64 golden-запросах |
+| A/B temperature / top_p / max_tokens | готово | нашёл обрыв половины ответов при max_tokens 400 → 800 |
+| CI (GitHub Actions) | готов | guardrails + регрессия модели цены + MCP на каждый PR |
 | Сайт (Streamlit): поиск по тексту и фото | готов | проверен в браузере |
 | Объяснение цены по аналогам (RAG) | готово | ссылается на id реальных объявлений |
 | Golden dataset 32 запроса + evals | готово | precision@5 36.7% против 7.7% случайного |
-| A/B: каналы, язык запроса, температура | готово | см. EVALS.md |
+| A/B: каналы, язык запроса | готово | см. EVALS.md |
 | Трейсинг (Arize Phoenix) | готов | дашборд на localhost:6006 |
 | Skill (`skills/rent-price-check`) | готов | SKILL.md + CLI, проверен |
 | **Модель цены** | **готова, измерена** | out-of-fold на 7 476 объявлениях |
@@ -289,6 +292,13 @@ price_model.py   бейзлайн, CatBoost MultiQuantile на log(price), CQR, 
 validate.py      robust / review / score / rooms
 mock_data.py     синтетика, чтобы каркас работал без реальных данных
 run_pipeline.py  CLI: mock, prepare, status, index, embed, rooms, embed-text, search, validate
+api.py           публичный слой: search_listings, estimate_price, get_comparables, get_listing
+mcp_server.py    MCP-сервер поверх api.py (stdio)
+guardrails.py    входной/выходной фильтр вокруг LLM
+agent.py         LangGraph: parse → confirm? → search ⇄ relax → answer
+ab_generation.py A/B temperature / top_p / max_tokens
+eval_guardrails.py  evals фильтра (порог для CI)
+tests/           pytest: guardrails, регрессия модели цены, MCP-сервер
 kaggle_embed.ipynb  векторизация на Kaggle GPU → артефакты в формате этого проекта
 ```
 
@@ -298,6 +308,10 @@ kaggle_embed.ipynb  векторизация на Kaggle GPU → артефак�
 python run_pipeline.py prepare      # сырые объявления -> единая схема
 python run_pipeline.py status       # что посчитано, какие каналы поиска включатся
 python run_pipeline.py search --text "светлая кухня" --city алматы --rooms 2 --price-max 400000
+
+python mcp_server.py --selftest     # MCP-сервер: клиент в памяти вызывает все инструменты
+python eval_guardrails.py           # evals фильтра
+pytest tests                        # то же, что гоняет CI
 ```
 
 ---
