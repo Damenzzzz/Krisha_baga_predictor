@@ -12,3 +12,4 @@ os.environ["BAGA_VAR"] = _tmp
 os.environ["BAGA_USERS"] = str(Path(_tmp) / "users.json")
 os.environ["LANGFUSE_TRACING"] = "false"
 os.environ["TRACING"] = "0"
+os.environ["COOKIE_SECURE"] = "0"          # тестовый клиент ходит по http — secure-cookie он не отправит

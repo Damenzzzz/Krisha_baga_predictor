@@ -328,6 +328,26 @@ Long polling, а не вебхук: не нужен публичный HTTPS, р
 
 ## Развёртывание
 
+Публичный сайт — **https://baga-ai.vercel.app**:
+
+```
+браузер ──► Vercel (CDN: HTML, CSS, JS из web/)
+                │  /api/*, /healthz — rewrite
+                ▼
+        Cloudflare-туннель ──► Mac: docker compose (сайт + API, Qdrant, Telegram-бот)
+```
+
+Почему бэкенд не на самом Vercel: функции для Python ограничены 500 МБ, а torch и SigLIP 2
+весят ~2 ГБ; пауза ассистента на подтверждение хранится в памяти процесса между запросами, а
+у serverless-функций постоянного процесса нет. Hugging Face Spaces с сентября 2026 требует
+PRO для Docker-Space (`deploy/hf_deploy.py` готов к переезду). Поэтому бэкенд работает у нас,
+а Vercel проксирует /api на туннель — для браузера это один домен, cookie сессии работают.
+
+После перезагрузки Mac: `sh deploy/public_up.sh` — поднимает Docker, новый туннель и
+передеплоивает Vercel на его адрес. Ограничение честное: сайт доступен, пока Mac включён.
+
+### Локально
+
 ```bash
 cp .env.example .env        # ключи Gemini / ALEM / Langfuse
 docker compose up -d        # Qdrant + загрузка индекса + сайт: http://localhost:8501

@@ -5,6 +5,8 @@
 квартира похожих**. Всё — от парсера krisha.kz до сайта, Telegram-бота и оценки качества —
 мы сделали вдвоём.
 
+**Попробовать:** https://baga-ai.vercel.app · Telegram-бот [@krishaa_ai_bot](https://t.me/krishaa_ai_bot)
+
 ![главная страница](baga-ai/docs/screenshots/home_hero.png)
 
 ## Какую проблему мы решаем
@@ -34,7 +36,7 @@
 | Канал | Как |
 |---|---|
 | Telegram-бот | [@krishaa_ai_bot](https://t.me/krishaa_ai_bot) — текст, голосовые, ссылки на krisha.kz |
-| Сайт | `docker compose up -d` → http://localhost:8501 (инструкция ниже); публичная ссылка — [deploy/HUGGINGFACE.md](baga-ai/deploy/HUGGINGFACE.md) |
+| Сайт | **https://baga-ai.vercel.app** · или у себя: `docker compose up -d` → http://localhost:8501 |
 | Claude, Cursor | MCP-сервер: `claude mcp add baga-ai -- python baga-ai/mcp_server.py` |
 
 ## Как это выглядит
@@ -180,7 +182,7 @@ pytest tests                            # 50 тестов, то же, что в 
 | Свой eval-фреймворк, нестандартные метрики | `ab_models.py`, `eval_visual_judge.py` | «ловушки», «выдуманные суммы и id», «покрытие», визуальный судья |
 | Интеграция с внешним API | `telegram_bot.py` | Telegram Bot API |
 | Реальные пользователи и обратная связь | `store.py`, панель админа | 👍/👎 на сайте и в боте → SQLite и оценки в Langfuse |
-| Деплой на публичный URL | `deploy/HUGGINGFACE.md`, `start.sh` | образ готов к Hugging Face Spaces |
+| Деплой на публичный URL | `deploy/vercel_deploy.py`, `deploy/public_up.sh` | https://baga-ai.vercel.app — фронтенд на Vercel, API проксируется на бэкенд |
 
 ## Ограничения
 

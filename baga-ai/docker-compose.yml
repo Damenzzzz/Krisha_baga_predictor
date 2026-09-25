@@ -53,6 +53,8 @@ services:
     <<: *baga
     command: ["python", "telegram_bot.py"]
     profiles: ["telegram"]
+    healthcheck:
+      disable: true          # проверка из Dockerfile смотрит на порт сайта, у бота его нет
     depends_on:
       init:
         condition: service_completed_successfully
