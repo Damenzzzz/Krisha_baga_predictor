@@ -1,0 +1,61 @@
+{
+ "base": {
+  "desc->photo": {
+   "recall@1": 0.0,
+   "recall@10": 0.6,
+   "n": 1389
+  },
+  "golden": {
+   "precision@5": 25.0,
+   "случайно": 7.9,
+   "по запросам": {
+    "wardrobe": 20,
+    "dishwasher": 0,
+    "balcony": 60,
+    "panoramic": 0,
+    "studio": 0,
+    "kitchen_living": 0,
+    "aircon": 40,
+    "designer": 0,
+    "new_building": 40,
+    "unfurnished": 40,
+    "mountain_view": 60,
+    "sauna": 40
+   }
+  },
+  "visual": {
+   "visual_precision@5": 73.8,
+   "вердиктов": 160
+  }
+ },
+ "lora": {
+  "desc->photo": {
+   "recall@1": 0.1,
+   "recall@10": 1.2,
+   "n": 1389
+  },
+  "golden": {
+   "precision@5": 28.3,
+   "случайно": 7.9,
+   "по запросам": {
+    "wardrobe": 20,
+    "dishwasher": 0,
+    "balcony": 80,
+    "panoramic": 0,
+    "studio": 0,
+    "kitchen_living": 0,
+    "aircon": 20,
+    "designer": 0,
+    "new_building": 100,
+    "unfurnished": 20,
+    "mountain_view": 60,
+    "sauna": 40
+   }
+  },
+  "visual": {
+   "visual_precision@5": 76.9,
+   "вердиктов": 160
+  }
+ },
+ "decision": "не включать: прирост +3.1 п.п. на визуальном судье в пределах шума"
+}
