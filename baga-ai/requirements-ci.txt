@@ -16,3 +16,6 @@ langfuse>=4
 langgraph
 langchain-core
 httpx
+fastapi>=0.110
+python-multipart
+itsdangerous

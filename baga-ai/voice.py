@@ -42,6 +42,7 @@ def transcribe(audio: bytes, mime: str = "audio/wav", user_id: str | None = None
         raise VoiceUnavailable("пустая запись")
     if len(audio) > MAX_AUDIO_BYTES:
         raise VoiceUnavailable("запись длиннее ~5 минут — сократите запрос")
+    audio, mime = normalize_audio(audio, mime)
     try:
         r = llm.complete("", [STT_PROMPT, types.Part.from_bytes(data=audio, mime_type=mime)], task="stt",
                          temperature=0, max_tokens=300, thinking="minimal", providers=["gemini"],
@@ -105,13 +106,44 @@ def pcm_to_wav(pcm: bytes, rate: int = 24000) -> bytes:
     return buf.getvalue()
 
 
+GEMINI_AUDIO = {"audio/wav", "audio/x-wav", "audio/mp3", "audio/mpeg", "audio/aiff", "audio/aac", "audio/ogg", "audio/flac"}
+
+
+def _ffmpeg() -> str | None:
+    import shutil
+    exe = shutil.which("ffmpeg")
+    if exe:
+        return exe
+    try:                                       # pip install imageio-ffmpeg — ffmpeg без brew/apt
+        import imageio_ffmpeg
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        return None
+
+
+def normalize_audio(data: bytes, mime: str) -> tuple[bytes, str]:
+    """Браузеры пишут webm (Chrome, Firefox) или mp4 (Safari), а Gemini их не принимает —
+    перекодируем в WAV 16 кГц моно. Поддерживаемые форматы отдаём как есть."""
+    import subprocess
+    if mime in GEMINI_AUDIO:
+        return data, mime
+    exe = _ffmpeg()
+    if not exe:
+        raise VoiceUnavailable("на сервере нет ffmpeg для перекодирования записи")
+    p = subprocess.run([exe, "-loglevel", "error", "-i", "pipe:0", "-ac", "1", "-ar", "16000", "-f", "wav", "pipe:1"],
+                       input=data, capture_output=True, timeout=60)
+    if p.returncode != 0 or not p.stdout:
+        raise VoiceUnavailable("не удалось прочитать запись — попробуйте ещё раз")
+    return p.stdout, "audio/wav"
+
+
 def wav_to_ogg_opus(wav: bytes) -> bytes | None:
     """Голосовое сообщение Telegram принимает только OGG/Opus. Нужен ffmpeg (есть в
-    Docker-образе); без него бот отвечает текстом."""
-    import shutil
+    Docker-образе) или пакет imageio-ffmpeg; без них бот отвечает текстом."""
     import subprocess
-    if not shutil.which("ffmpeg"):
+    exe = _ffmpeg()
+    if not exe:
         return None
-    p = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", "pipe:0", "-c:a", "libopus", "-b:a", "32k",
+    p = subprocess.run([exe, "-loglevel", "error", "-i", "pipe:0", "-c:a", "libopus", "-b:a", "32k",
                         "-f", "ogg", "pipe:1"], input=wav, capture_output=True, timeout=60)
     return p.stdout if p.returncode == 0 and p.stdout else None

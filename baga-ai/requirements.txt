@@ -13,6 +13,7 @@ python-dotenv
 openai                  # ALEM: text-1024 для описаний и alemllm (фолбэк), OpenAI-совместимый API
 google-genai>=2.0       # Gemini 3.6 Flash (Vertex AI): основная LLM, распознавание и синтез речи
 httpx                   # Telegram-бот (long polling)
+imageio-ffmpeg          # ffmpeg для голосовых ответов в Telegram, если системного нет
 qdrant-client
 catboost
 scikit-learn
@@ -20,4 +21,7 @@ langgraph
 langchain-core
 langfuse>=4             # трейсинг: LLM, узлы LangGraph, оценки пользователей
 mcp>=1.10,<2            # FastMCP API (mcp_server.py); в 2.x он переименован в MCPServer
-streamlit>=1.50         # st.audio_input, st.feedback, width="stretch"
+fastapi>=0.110          # сайт: JSON API + статический фронтенд (web/)
+uvicorn[standard]
+python-multipart        # загрузка фото и голосовых
+itsdangerous            # подпись cookie сессии

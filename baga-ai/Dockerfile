@@ -1,4 +1,4 @@
-# Baga AI: сайт (Streamlit), Telegram-бот и MCP-сервер — один образ, разные команды.
+# Baga AI: сайт (FastAPI + web/), Telegram-бот и MCP-сервер — один образ, разные команды.
 #
 #   docker compose up -d            — Qdrant + загрузка индекса + сайт на :8501
 #   docker compose --profile telegram up -d   — ещё и бот
@@ -12,8 +12,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     HF_HOME=/opt/hf \
     BAGA_VAR=/data/var \
-    STREAMLIT_SERVER_HEADLESS=true \
-    STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+    COOKIE_SECURE=0
 
 # ffmpeg — голосовые ответы в Telegram (WAV -> OGG/Opus); libgomp — CatBoost и torch на CPU
 RUN apt-get update \
@@ -41,6 +40,6 @@ USER baga
 
 EXPOSE 8501
 HEALTHCHECK --interval=30s --timeout=5s --start-period=300s --retries=3 \
-    CMD curl -fs "http://localhost:${PORT:-8501}/_stcore/health" || exit 1
+    CMD curl -fs "http://localhost:${PORT:-8501}/healthz" || exit 1
 
 CMD ["./start.sh"]

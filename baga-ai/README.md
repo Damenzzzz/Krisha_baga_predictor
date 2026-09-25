@@ -19,14 +19,14 @@ docker compose up -d          # Qdrant + загрузка индекса + са�
 ```bash
 pip install -r requirements.txt
 python qdrant_store.py ensure           # векторы фото и описаний -> встроенный Qdrant (один раз)
-streamlit run app.py                    # сайт
+uvicorn server:app --port 8501          # сайт → http://localhost:8501
 python telegram_bot.py                  # бот (нужен TELEGRAM_BOT_TOKEN от @BotFather)
 python mcp_server.py --selftest         # MCP-сервер
 python auth.py add admin --role admin   # первый админ (или BAGA_ADMIN_USER / BAGA_ADMIN_PASSWORD)
 pytest tests                            # то же, что CI
 ```
 
-![ассистент](docs/screenshots/assistant.png)
+![главная](docs/screenshots/home_hero.png)
 
 | Что | Где |
 |---|---|
@@ -195,7 +195,7 @@ Kaggle, а используются локально. Целостность с�
 | Guardrails (`guardrails.py`) | готов | injection recall 95%, 0 ложных блокировок на 64 golden-запросах |
 | A/B temperature / top_p / max_tokens | готово | нашёл обрыв половины ответов при max_tokens 400 → 800 |
 | CI (GitHub Actions) | готов | guardrails + регрессия модели цены + MCP на каждый PR |
-| Сайт (Streamlit): поиск по тексту и фото | готов | проверен в браузере |
+| Сайт: FastAPI + свой фронтенд (главная, поиск, цена, вход, админка) | готов | 7 тестов API, проверен в браузере на десктопе и телефоне |
 | Объяснение цены по аналогам (RAG) | готово | ссылается на id реальных объявлений |
 | Golden dataset 32 запроса + evals | готово | precision@5 36.7% против 7.7% случайного |
 | A/B: каналы, язык запроса | готово | см. EVALS.md |
@@ -345,7 +345,8 @@ tracing.py       Langfuse (основной) + Phoenix (локальный)
 auth.py          пользователи, роли guest/user/admin, лимит частоты
 voice.py         речь ↔ текст через Gemini
 telegram_bot.py  бот: текст, голос, ссылки krisha, подтверждение кнопками
-app.py, ui.py    сайт (Streamlit): поиск, ассистент, голос, отзывы, админ-панель
+server.py        сайт: JSON API (FastAPI), сессии, роли; отдаёт фронтенд из web/
+web/             главная, поиск (ассистент, описание, фото, цена), вход, панель админа
 ab_models.py     A/B ALEM против Gemini, --gate для CI
 eval_semantic_cache.py  подбор порога смыслового кэша
 finetune_text_lora.py   LoRA на текстовую башню SigLIP 2

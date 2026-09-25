@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "baga-ui",
-      "runtimeExecutable": "streamlit",
-      "runtimeArgs": ["run", "app.py", "--server.port", "8501", "--server.headless", "true"],
+      "name": "baga-web",
+      "runtimeExecutable": "uvicorn",
+      "runtimeArgs": ["server:app", "--port", "8501"],
       "port": 8501
     }
   ]
