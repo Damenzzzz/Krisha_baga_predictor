@@ -4,8 +4,36 @@
 решения с обоснованием и — отдельным разделом — то, что ещё **не** проверено.
 Если вы ИИ-ревьюер: в конце есть список вопросов, по которым нужна критика.
 
-Дата: 2026-09-22. Проект — финальный на курсе nFactorial, срок ~2 недели, команда 2 человека.
+Дата: 2026-09-25. Проект — финальный на курсе nFactorial, срок ~2 недели, команда 2 человека.
 Обязательные требования курса: в проекте должны быть RAG и MCP.
+
+## Быстрый старт
+
+```bash
+cp .env.example .env          # GEMINI_API_KEY, ALEM_*, LANGFUSE_* (без ключей — поиск и вердикт работают)
+docker compose up -d          # Qdrant + загрузка индекса + сайт → http://localhost:8501
+```
+
+Без Docker:
+
+```bash
+pip install -r requirements.txt
+python qdrant_store.py ensure           # векторы фото и описаний -> встроенный Qdrant (один раз)
+streamlit run app.py                    # сайт
+python telegram_bot.py                  # бот (нужен TELEGRAM_BOT_TOKEN от @BotFather)
+python mcp_server.py --selftest         # MCP-сервер
+python auth.py add admin --role admin   # первый админ (или BAGA_ADMIN_USER / BAGA_ADMIN_PASSWORD)
+pytest tests                            # то же, что CI
+```
+
+![ассистент](docs/screenshots/assistant.png)
+
+| Что | Где |
+|---|---|
+| Архитектура, путь одного запроса, решения | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| Golden datasets, метрики, A/B | [EVALS.md](EVALS.md) |
+| Трейсы | Langfuse (`LANGFUSE_BASE_URL`), ссылка — в админ-панели сайта |
+| Парсер krisha.kz | [../KrishaParser](../KrishaParser) |
 
 ---
 
@@ -171,11 +199,23 @@ Kaggle, а используются локально. Целостность с�
 | Объяснение цены по аналогам (RAG) | готово | ссылается на id реальных объявлений |
 | Golden dataset 32 запроса + evals | готово | precision@5 36.7% против 7.7% случайного |
 | A/B: каналы, язык запроса | готово | см. EVALS.md |
-| Трейсинг (Arize Phoenix) | готов | дашборд на localhost:6006 |
+| Трейсинг (Arize Phoenix, локально) | готов | дашборд на localhost:6006, опционально |
 | Skill (`skills/rent-price-check`) | готов | SKILL.md + CLI, проверен |
 | **Модель цены** | **готова, измерена** | out-of-fold на 7 476 объявлениях |
 | Поиск дублей (DINOv3 + геометрия) | готов | 611 объявлений в 275 группах |
 | Оформление сайта (`ui.py`, тема) | готово | сетка карточек, бейдж вердикта, чипы условий |
+| **Шлюз LLM**: Gemini 3.6 Flash → ALEM → шаблон | готов | предохранитель, бюджет, кэш; 11 тестов на фейковых провайдерах |
+| A/B ALEM против Gemini (4 задачи + thinking) | готово | разбор 100% против 77.8%; порог в CI |
+| Смысловой кэш разбора запроса | готов | порог 0.94 подобран на «светлая/тёмная кухня» |
+| Трейсинг Langfuse | готов | трейс на запрос: узлы графа, генерации с ценой, 👍/👎 |
+| Роли guest / user / admin, лимиты, админ-панель | готово | проверено AppTest: вход, режимы по ролям, админка |
+| Голос: STT + TTS (Gemini) | готов | в сайте и в Telegram |
+| Telegram-бот | готов | текст, голос, ссылки krisha, inline-подтверждение |
+| Docker + compose, CI (5 задач) | готово | образ собирается, `docker compose up` |
+| Визуальный судья (Gemini по фото) | готов | визуальная precision@5 81–84%; нашёл, что канал описаний портил выдачу (59%) |
+| Вес описаний в RRF 1.0 → 0.5 | готово | визуальная precision@5 59.5% → 81.9% |
+| LoRA на текстовую башню SigLIP 2 | проверено, не включено | +3.1 п.п. — в пределах шума, EVALS.md раздел 9 |
+| Мультимодальный реранкер | проверено, выключен | независимая метрика +1.7 п.п. при ×4 цене, раздел 10 |
 
 ---
 
@@ -298,7 +338,23 @@ guardrails.py    входной/выходной фильтр вокруг LLM
 agent.py         LangGraph: parse → confirm? → search ⇄ relax → answer
 ab_generation.py A/B temperature / top_p / max_tokens
 eval_guardrails.py  evals фильтра (порог для CI)
-tests/           pytest: guardrails, регрессия модели цены, MCP-сервер
+llm.py           шлюз LLM: Gemini 3.6 Flash → ALEM → шаблон; предохранитель, бюджет, кэш
+semantic_cache.py   смысловой кэш разбора запроса (подпись + косинус)
+store.py         SQLite: учёт вызовов и стоимости, кэш, отзывы
+tracing.py       Langfuse (основной) + Phoenix (локальный)
+auth.py          пользователи, роли guest/user/admin, лимит частоты
+voice.py         речь ↔ текст через Gemini
+telegram_bot.py  бот: текст, голос, ссылки krisha, подтверждение кнопками
+app.py, ui.py    сайт (Streamlit): поиск, ассистент, голос, отзывы, админ-панель
+ab_models.py     A/B ALEM против Gemini, --gate для CI
+eval_semantic_cache.py  подбор порога смыслового кэша
+finetune_text_lora.py   LoRA на текстовую башню SigLIP 2
+rerank.py        мультимодальный реранкер (Gemini смотрит на фото), выкл. по умолчанию
+eval_visual_judge.py    визуальный судья: precision@5 по фото
+eval_rerank.py   нужен ли реранкер
+start.sh         старт одного контейнера: индекс + сайт (Spaces, docker run)
+Dockerfile, docker-compose.yml   образ и запуск одной командой
+tests/           pytest: guardrails, модель цены, MCP, шлюз LLM, кэш, авторизация, голос
 kaggle_embed.ipynb  векторизация на Kaggle GPU → артефакты в формате этого проекта
 ```
 
