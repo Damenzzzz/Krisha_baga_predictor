@@ -15,6 +15,7 @@ from typing import Any, Optional
 
 import pandas as pd
 
+from config import ART_DIR
 from listings import Filters, load_listings
 
 
@@ -67,6 +68,11 @@ def search_listings(query: Optional[str] = None, city: Optional[str] = None,
                                   rooms=photo_rooms, k=k)
         sp.set(**{"n_candidates": res["n_candidates"], "channels": ",".join(res["channels_used"]),
                   "n_results": len(res["results"])})
+    import rerank
+    if rerank.enabled() and query and len(res["results"]) > 1:
+        with span("rerank", kind="RETRIEVER", **{"input.value": query}) as sp:
+            res["results"], rep = rerank.rerank(query, res["results"], url_of=_photo_url)
+            sp.set(output=[r["listing_id"] for r in res["results"]], **rep)
     if with_price_verdict:
         for r in res["results"]:
             try:
@@ -155,3 +161,19 @@ def _plain(v):
 
 
 TOOLS = [search_listings, estimate_price, get_comparables, get_listing]
+
+
+_urls = None
+
+
+def _photo_url(path: str | None, listing_id: str | None = None) -> str | None:
+    """CDN-ссылка на фото: для реранкера там, где файлов фото нет (Docker, Spaces)."""
+    global _urls
+    if _urls is None:
+        try:
+            u = pd.read_parquet(ART_DIR / "photo_urls.parquet")
+            _urls = (dict(zip(u.path, u.url)),
+                     u.sort_values(["listing_id", "photo_n"]).groupby("listing_id").url.first().to_dict())
+        except Exception:
+            _urls = ({}, {})
+    return _urls[0].get(path) or _urls[1].get(str(listing_id))

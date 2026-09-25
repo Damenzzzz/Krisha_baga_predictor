@@ -15,7 +15,7 @@
 import numpy as np
 import pandas as pd
 
-from config import DESC_EMB_PATH, EMB_PATH, RENDER_THR, ROOM_AUTO_CONF, ROOMS_PATH, RRF_K
+from config import DESC_EMB_PATH, EMB_PATH, RENDER_THR, ROOM_AUTO_CONF, ROOMS_PATH, RRF_DESC_WEIGHT, RRF_K
 from listings import Filters, apply_filters, load_listings
 
 CARD_FIELDS = ["price", "area", "rooms", "price_per_m2", "city", "district", "floor", "floors_total",
@@ -117,7 +117,8 @@ class ListingSearch:
                 return "qdrant"
         except Exception:
             pass
-        return "numpy" if EMB_PATH.exists() else "none"
+        has_parts = any(EMB_PATH.parent.glob(f"{EMB_PATH.stem}.part*.npy"))
+        return "numpy" if EMB_PATH.exists() or has_parts else "none"
 
     def search(self, text=None, filters: Filters | None = None, image=None, images=None,
                rooms=None, k=10, weights=None, candidates=200):
@@ -128,7 +129,7 @@ class ListingSearch:
         ни на кухню, ни на детскую. Вместо этого каждое фото — отдельный запрос со своим
         типом комнаты, а объявления ранжируются по слиянию этих запросов; отдельно
         считается покрытие — сколько из присланных фото объявление закрыло."""
-        weights = {"photo": 1.0, "desc": 1.0, **(weights or {})}
+        weights = {"photo": 1.0, "desc": RRF_DESC_WEIGHT, **(weights or {})}
         f = filters or Filters()
         districts_exact = resolve_districts(self.df, f.districts)
         cand = apply_filters(self.df, f)

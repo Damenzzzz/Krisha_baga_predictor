@@ -197,8 +197,15 @@ def stats():
 if __name__ == "__main__":
     import argparse
     p = argparse.ArgumentParser(description="Загрузка векторов в Qdrant")
-    p.add_argument("cmd", choices=["ingest", "ingest-photos", "ingest-desc", "stats"])
+    p.add_argument("cmd", choices=["ingest", "ingest-photos", "ingest-desc", "ensure", "stats"])
     a = p.parse_args()
+    if a.cmd == "ensure":
+        # для docker compose: загрузить только то, чего в базе ещё нет — повторный
+        # запуск контейнера не пересобирает индекс на 73 тысячи точек
+        if not has_collection(PHOTOS_COLLECTION):
+            ingest_photos()
+        if not has_collection(DESC_COLLECTION) and DESC_EMB_PATH.exists():
+            ingest_descriptions()
     if a.cmd in ("ingest", "ingest-photos"):
         ingest_photos()
     if a.cmd in ("ingest", "ingest-desc"):

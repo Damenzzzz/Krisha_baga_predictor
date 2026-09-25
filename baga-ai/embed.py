@@ -89,6 +89,13 @@ def load_model():
     if _model is None:
         _proc = AutoProcessor.from_pretrained(CLIP_MODEL_ID)
         _model = AutoModel.from_pretrained(CLIP_MODEL_ID).eval().to(DEVICE, dtype=DTYPE)
+        if os.getenv("USE_TEXT_LORA", "0") == "1":
+            # LoRA на текстовую башню (finetune_text_lora.py): визуальная не тронута,
+            # поэтому эмбеддинги галереи остаются валидными
+            from finetune_text_lora import ADAPTER_DIR, attach_adapter
+            if (ADAPTER_DIR / "adapter.pt").exists():
+                attach_adapter(_model)
+                _model.to(DEVICE, dtype=DTYPE).eval()
         _views, _img_size = make_views(_proc.image_processor)
     return _model, _proc, _views
 
@@ -219,7 +226,28 @@ def load_embeddings():
         if meta.get(key) != now[key]:
             raise RuntimeError(f"Галерея посчитана с {key}={meta.get(key)}, а запросы будут с {now[key]} — "
                                f"векторы несравнимы. Верните настройку или перезапустите embed --force.")
-    return idx, np.load(EMB_PATH).astype(np.float32), np.load(VALID_PATH)
+    return idx, emb_matrix().astype(np.float32), np.load(VALID_PATH)
+
+
+def emb_matrix() -> np.ndarray:
+    """Матрица эмбеддингов галереи. В git она лежит частями (photo_emb.part0.npy, ...):
+    целиком 107 МБ — больше лимита GitHub на файл. При первом чтении части склеиваются."""
+    if not EMB_PATH.exists():
+        parts = sorted(EMB_PATH.parent.glob(f"{EMB_PATH.stem}.part*.npy"))
+        if not parts:
+            raise FileNotFoundError(f"нет {EMB_PATH} и его частей — запустите: python run_pipeline.py embed")
+        np.save(EMB_PATH, np.concatenate([np.load(p) for p in parts]))
+    return np.load(EMB_PATH)
+
+
+def split_for_git(n_parts: int = 2):
+    """Режет photo_emb.npy на части меньше 100 МБ для коммита в git."""
+    E = np.load(EMB_PATH)
+    for old in EMB_PATH.parent.glob(f"{EMB_PATH.stem}.part*.npy"):
+        old.unlink()
+    for i, chunk in enumerate(np.array_split(E, n_parts)):
+        np.save(EMB_PATH.parent / f"{EMB_PATH.stem}.part{i}.npy", chunk)
+    print(f"{EMB_PATH.name}: {E.shape} -> {n_parts} части")
 
 
 # ---------------------------------------------------------------- запросы
