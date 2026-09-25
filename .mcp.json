@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "baga-ai": {
+      "command": "python",
+      "args": ["baga-ai/mcp_server.py"]
+    }
+  }
+}
