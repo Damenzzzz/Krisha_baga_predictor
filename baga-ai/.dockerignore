@@ -1,0 +1,26 @@
+# Секреты — только через env_file, в образ не попадают
+.env
+.env.*
+!.env.example
+
+.git
+.github
+.claude
+.pytest_cache
+**/__pycache__
+*.pyc
+.DS_Store
+
+# состояние и тяжёлые данные: в контейнере не нужны или пересобираются
+var/
+data/
+notebooks/
+review/
+mew.ipynb
+artifacts/qdrant/
+artifacts/qdrant_server/
+artifacts/emb_shards/
+artifacts/photo_emb.npy
+artifacts/dino_emb.npy
+artifacts/dino_index.parquet
+catboost_info/

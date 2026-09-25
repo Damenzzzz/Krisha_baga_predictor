@@ -1,0 +1,18 @@
+# Минимум для CI: guardrails, модель цены, MCP-сервер, шлюз LLM, кэш, авторизация.
+# Без torch/SigLIP/Qdrant — векторный поиск в CI не проверяется (гигабайты весов и эмбеддингов).
+numpy
+pandas
+pyarrow
+pydantic>=2
+python-dotenv
+catboost
+scikit-learn
+mcp>=1.10,<2          # FastMCP API; в 2.x сервер называется MCPServer
+anyio
+pytest
+openai
+google-genai>=2.0
+langfuse>=4
+langgraph
+langchain-core
+httpx

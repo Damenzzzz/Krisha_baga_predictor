@@ -6,19 +6,18 @@ numpy
 pandas
 pyarrow
 pillow
-opencv-python           # CLAHE (из museum) и перспектива в validate.py
+opencv-python-headless  # CLAHE (из museum) и перспектива в validate.py; headless — без GUI-библиотек в Docker
 tqdm
 pydantic>=2
 python-dotenv
-openai                  # ALEM text-1024 для описаний (OpenAI-совместимый API)
+openai                  # ALEM: text-1024 для описаний и alemllm (фолбэк), OpenAI-совместимый API
+google-genai>=2.0       # Gemini 3.6 Flash (Vertex AI): основная LLM, распознавание и синтез речи
+httpx                   # Telegram-бот (long polling)
 qdrant-client
 catboost
 scikit-learn
 langgraph
-langchain-openai
-langsmith
-mcp
-streamlit
-langgraph
-arize-phoenix
-openinference-instrumentation-openai
+langchain-core
+langfuse>=4             # трейсинг: LLM, узлы LangGraph, оценки пользователей
+mcp>=1.10,<2            # FastMCP API (mcp_server.py); в 2.x он переименован в MCPServer
+streamlit>=1.50         # st.audio_input, st.feedback, width="stretch"

@@ -1,0 +1,5 @@
+# Локальный трейсинг без аккаунта (TRACING=1, дашборд на :6006). Основной — Langfuse.
+arize-phoenix
+openinference-instrumentation-openai
+# LangSmith как альтернативный облачный трейсер
+langsmith
