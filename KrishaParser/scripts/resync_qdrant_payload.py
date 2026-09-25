@@ -6,8 +6,8 @@ Some payload fields are set at embed time but change later:
     so freshly embedded points carry a stale/NULL group.
 
 This scrolls every point, reads its `listing_id` from the payload, looks up the
-current DB values, and patches only the points whose `city` or
-`duplicate_group_id` differ. Idempotent; safe to re-run after any crawl/embed/dedup.
+current DB values, and patches all mutable listing fields, including price,
+coordinates and dedup groups. Idempotent; re-run after details/embed/dedup.
 
 Usage (targets QDRANT_URL from .env — local Docker or cloud):
     python -m scripts.resync_qdrant_payload [--dry-run]
@@ -15,10 +15,89 @@ Usage (targets QDRANT_URL from .env — local Docker or cloud):
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 
 from krisha.db import Database
 from krisha.embed_worker import COLLECTION, make_client
+from krisha.payload import listing_payload
+
+
+def payload_matches(payload: dict, expected: dict) -> bool:
+    """Ignore JSON floating-point roundoff, but retain meaningful field changes."""
+    for key, value in expected.items():
+        actual = payload.get(key)
+        if actual == value:
+            continue
+        if (isinstance(value, float) and isinstance(actual, (int, float))
+                and math.isclose(actual, value, rel_tol=1e-12, abs_tol=1e-9)):
+            continue
+        return False
+    return True
+
+
+def sync_listings(client, db: Database, listing_ids: set[int]) -> None:
+    """Incremental sync by indexed owner listing_id; shared-photo owners stay intact."""
+    from qdrant_client.models import Filter, FieldCondition, MatchValue, SetPayload, SetPayloadOperation
+    operations = []
+    for lid in sorted(listing_ids):
+        row = db.get_listing(lid)
+        if row is None:
+            continue
+        operations.append(SetPayloadOperation(set_payload=SetPayload(
+            payload=listing_payload(row),
+            filter=Filter(must=[FieldCondition(key="listing_id", match=MatchValue(value=lid))]))))
+        if len(operations) >= 100:
+            client.batch_update_points(COLLECTION, operations, wait=True)
+            operations = []
+    if operations:
+        client.batch_update_points(COLLECTION, operations, wait=True)
+
+
+def resync(client, db: Database, dry_run: bool = False) -> dict:
+    from qdrant_client.models import SetPayload, SetPayloadOperation
+
+    truth = {r["id"]: listing_payload(r) for r in db.all_listings()}
+    scanned = missing = 0
+    stale: dict[int, list] = {}
+    offset = None
+    while True:
+        points, offset = client.scroll(
+            COLLECTION, limit=1000, offset=offset,
+            with_payload=True, with_vectors=False)
+        for point in points:
+            scanned += 1
+            payload = point.payload or {}
+            lid = payload.get("listing_id")
+            if lid not in truth:
+                missing += 1
+                continue
+            if not payload_matches(payload, truth[lid]):
+                stale.setdefault(lid, []).append(point.id)
+        if offset is None:
+            break
+    count = sum(len(ids) for ids in stale.values())
+    print(f"scanned {scanned} points; stale {count} across {len(stale)} listings; "
+          f"{missing} points had no matching DB listing", flush=True)
+    fixed = 0
+    operations = []
+    queued = 0
+    if not dry_run:
+        for lid, ids in stale.items():
+            for start in range(0, len(ids), 1000):
+                chunk = ids[start:start + 1000]
+                operations.append(SetPayloadOperation(set_payload=SetPayload(
+                    payload=truth[lid], points=chunk)))
+                queued += len(chunk)
+                if len(operations) >= 100:
+                    client.batch_update_points(COLLECTION, operations, wait=True)
+                    fixed += queued
+                    operations, queued = [], 0
+                    print(f"confirmed {fixed}/{count} points updated", flush=True)
+        if operations:
+            client.batch_update_points(COLLECTION, operations, wait=True)
+            fixed += queued
+    return {"scanned": scanned, "stale": count, "fixed": fixed, "missing": missing}
 
 
 def main() -> int:
@@ -32,49 +111,11 @@ def main() -> int:
         print(f"collection {COLLECTION!r} not found; run `embed` first")
         return 1
 
-    db = Database()
-    # listing_id -> (city, duplicate_group_id) authoritative values
-    truth = {r["id"]: (r["city"], r["duplicate_group_id"])
-             for r in db.conn.execute(
-                 "SELECT id, city, duplicate_group_id FROM listings")}
-
-    # Group stale point ids by listing so all a listing's photos are patched in
-    # one call (a listing's points share city + duplicate_group_id).
-    scanned = missing = 0
-    stale: dict[int, list] = {}
-    offset = None
-    while True:
-        points, offset = client.scroll(
-            COLLECTION, limit=1000, offset=offset,
-            with_payload=["listing_id", "city", "duplicate_group_id"],
-            with_vectors=False)
-        for p in points:
-            scanned += 1
-            pl = p.payload or {}
-            lid = pl.get("listing_id")
-            if lid not in truth:
-                missing += 1
-                continue
-            city, dgid = truth[lid]
-            if pl.get("city") != city or pl.get("duplicate_group_id") != dgid:
-                stale.setdefault(lid, []).append(p.id)
-        if offset is None:
-            break
-
-    points_fixed = sum(len(v) for v in stale.values())
-    verb = "would fix" if args.dry_run else "fixed"
-    print(f"scanned {scanned} points; {verb} {points_fixed} points across "
-          f"{len(stale)} listings; {missing} points had no matching DB listing")
-    if args.dry_run:
-        return 0
-
-    for lid, ids in stale.items():
-        city, dgid = truth[lid]
-        for i in range(0, len(ids), 1000):
-            client.set_payload(COLLECTION,
-                               payload={"city": city, "duplicate_group_id": dgid},
-                               points=ids[i:i + 1000], wait=False)
-    print("done")
+    try:
+        with Database() as db:
+            print(resync(client, db, dry_run=args.dry_run))
+    finally:
+        client.close()
     return 0
 
 

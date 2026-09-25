@@ -5,7 +5,7 @@ import argparse
 import sys
 
 from . import config
-from .controller import (BlockedStop, CaptchaStop, Controller, LayoutChangeStop)
+from .controller import (BlockedStop, CaptchaStop, Controller, LayoutChangeStop, NetworkStop)
 from .db import Database
 from .logging_setup import setup_logging
 
@@ -22,6 +22,10 @@ def build_parser() -> argparse.ArgumentParser:
     d = sub.add_parser("details", help="fetch + parse detail pages (Playwright)")
     d.add_argument("--city", choices=list(config.CITY_PATHS), default=None)
     d.add_argument("--limit", type=int, default=None)
+    d.add_argument("--refresh-missing", action="store_true",
+                   help="also retry incomplete details once per parser version")
+    d.add_argument("--cached-only", action="store_true",
+                   help="reparse saved successful pages without any network requests")
 
     ph = sub.add_parser("photos", help="download pending photos (httpx)")
     ph.add_argument("--limit", type=int, default=None)
@@ -56,7 +60,7 @@ def main(argv: list[str] | None = None) -> int:
             crawl.run(db, ctrl, args.city, args.max_pages)
         elif args.command == "details":
             from .commands import details
-            details.run(db, ctrl, args.city, args.limit)
+            details.run(db, ctrl, args.city, args.limit, args.refresh_missing, args.cached_only)
         elif args.command == "photos":
             from .commands import photos
             photos.run(db, args.limit, expand=args.expand)
@@ -72,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "export":
             from .commands import export
             export.run(db, out_path=args.out, dedup=not args.no_dedup)
-    except (CaptchaStop, BlockedStop, LayoutChangeStop) as e:
+    except (CaptchaStop, BlockedStop, LayoutChangeStop, NetworkStop) as e:
         print(f"STOP: {type(e).__name__}: {e}", file=sys.stderr)
         return 2
     except KeyboardInterrupt:

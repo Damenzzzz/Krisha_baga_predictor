@@ -21,6 +21,9 @@ CARD_DESCR = ".a-card__descr"
 INFO_ITEM = "div.offer__info-item"
 INFO_TITLE = ".offer__info-title"
 INFO_VALUE = ".offer__advert-short-info"
+PARAMETER_ROW = ".offer__parameters dl"
+PARAMETER_NAME = "dt[data-name]"
+PARAMETER_VALUE = "dd"
 DESCRIPTION = ".offer__description"
 TITLE_H1 = "h1"
 
@@ -35,7 +38,10 @@ PARAM_MAP: dict[str, str] = {
     "flat.rent_renovation": "_renovation_extra",
     "flat.toilet": "bathroom",
     "flat.bath": "bathroom",
+    "separated_toilet": "bathroom",  # current rental form: combined/separate
     "flat.balcony": "balcony",
+    "balcony_count": "_balcony_count",
+    "loggia_count": "_loggia_count",
     "live.furniture": "furniture",
     "flat.furniture": "furniture",
     "map.complex": "complex_name",

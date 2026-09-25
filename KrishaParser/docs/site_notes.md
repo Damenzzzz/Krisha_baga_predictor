@@ -58,4 +58,5 @@ Region: Kaskelen + Almaty (all districts).
 - `468/403/429` are treated as blocks → AIMD doubles delay, concurrency→1, cooldown,
   honor `Retry-After`, and stop after `MAX_RETRIES`. CAPTCHA → stop run, never solve.
 - Detail scraping must be **slow and patient**; run it when the IP is not greylisted.
-  No proxies, no fingerprint spoofing, no captcha solving (hard rules).
+  Owner authorized proxies / IP rotation / VPN on 2026-09-23. Explicit proxy
+  configuration is supported; pacing, bounded retries and CAPTCHA stop remain.

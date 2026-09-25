@@ -38,6 +38,10 @@ class BlockedStop(RuntimeError):
     """Raised when a page stays blocked after cooldown + retries."""
 
 
+class NetworkStop(RuntimeError):
+    """Raised when the selected routes cannot complete a request after retries."""
+
+
 @dataclass
 class RuntimeProfile:
     engine: str = "http"
@@ -114,16 +118,21 @@ class Controller:
                 time.sleep(config.COOLDOWN_S)
                 raise CaptchaStop(url)
 
-            if result.is_block:
+            if result.is_block or result.status_code is None:
                 self._on_block(result)
                 attempts += 1
                 cooldown = result.retry_after or config.COOLDOWN_S
-                log.warning("blocked (%s) at %s, cooldown %.0fs (attempt %d)",
+                log.warning("request failed (%s) at %s, cooldown %.0fs (attempt %d)",
                             result.status_code, url, cooldown, attempts)
                 self._record(result, result.classify(), delay_used)
                 if attempts > config.MAX_RETRIES:
+                    if result.status_code is None:
+                        raise NetworkStop(f"{url}: routes unavailable after {attempts} attempts")
                     raise BlockedStop(f"{url} status={result.status_code}")
                 time.sleep(cooldown)
+                rotate = getattr(self.engine(engine), "rotate_proxy", None)
+                if rotate:
+                    rotate()
                 continue
 
             return result, delay_used
@@ -133,7 +142,8 @@ class Controller:
         """Report the final (parse-level) outcome for a fetched page."""
         self._record(result, outcome, delay_ms)
         if outcome == "ok":
-            self._on_success()
+            if not result.from_cache:
+                self._on_success()
             self._empty_streak = 0
         elif outcome == "empty_parse":
             self._empty_streak += 1

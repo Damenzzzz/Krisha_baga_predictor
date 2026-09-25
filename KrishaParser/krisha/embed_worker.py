@@ -10,6 +10,7 @@ import uuid
 from . import config
 from .db import Database
 from .logging_setup import get_logger
+from .payload import listing_payload
 
 log = get_logger("embed")
 
@@ -112,8 +113,6 @@ def run(db: Database, batch_size: int = 16, limit: int | None = None) -> dict:
             stats["skipped"] += 1
             continue
         batch.append(preprocess(img))
-        price = listing["price_kzt"]
-        area = listing["area_total"]
         metas.append({
             "sha256": row["sha256"],
             "listing_id": row["listing_id"],
@@ -121,17 +120,7 @@ def run(db: Database, batch_size: int = 16, limit: int | None = None) -> dict:
             "payload": {
                 "listing_id": row["listing_id"],
                 "photo_idx": row["idx"],
-                "city": listing["city"],
-                "district": listing["district"],
-                "rooms": listing["rooms"],
-                "area_total": area,
-                "floor": listing["floor"],
-                "price_kzt": price,
-                "price_per_m2": (price / area) if price and area else None,
-                "rent_period": listing["rent_period"],
-                "lat": listing["lat"],
-                "lon": listing["lon"],
-                "duplicate_group_id": listing["duplicate_group_id"],
+                **listing_payload(listing),
             },
         })
         if len(batch) >= batch_size:

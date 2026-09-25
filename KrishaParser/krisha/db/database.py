@@ -43,6 +43,9 @@ class Database:
 
     def init_db(self) -> None:
         self.conn.executescript(_SCHEMA.read_text(encoding="utf-8"))
+        columns = {r["name"] for r in self.conn.execute("PRAGMA table_info(listings)")}
+        if "detail_parser_version" not in columns:
+            self.conn.execute("ALTER TABLE listings ADD COLUMN detail_parser_version INTEGER")
         self.conn.commit()
 
     def close(self) -> None:
@@ -92,8 +95,12 @@ class Database:
 
     def update_detail(self, listing_id: int, fields: dict[str, Any]) -> None:
         """Fill parsed detail fields on an existing listing row."""
+        fields = dict(fields)
         if "city" in fields:
-            fields["city"] = normalize_city(fields["city"])
+            existing = self.get_listing(listing_id)
+            # `city` is the search bucket; oblast details contain individual towns.
+            fields["city"] = (existing["city"] if existing and existing["city"] in config.CITY_PATHS
+                              else normalize_city(fields["city"]))
         cols = [c for c in LISTING_FIELDS if c in fields]
         if not cols:
             return
@@ -102,10 +109,11 @@ class Database:
                 fields[c] = json.dumps(fields[c], ensure_ascii=False)
         assignments = ", ".join(f"{c}=?" for c in cols)
         values = [fields[c] for c in cols]
-        values += [_now(), listing_id]
+        now = _now()
+        values += [now, now, listing_id]
         self.conn.execute(
             f"UPDATE listings SET {assignments}, detail_fetched_at=?, "
-            f"last_seen_at=detail_fetched_at WHERE id=?",
+            f"last_seen_at=? WHERE id=?",
             values,
         )
         self.conn.commit()
@@ -134,14 +142,23 @@ class Database:
         self.conn.commit()
 
     def ids_without_detail(self, city: str | None = None,
-                           limit: int | None = None) -> list[int]:
-        q = "SELECT id FROM listings WHERE detail_fetched_at IS NULL"
+                           limit: int | None = None,
+                           refresh_missing: bool = False) -> list[int]:
+        from ..parsers.listing_detail import PARSER_VERSION
+        condition = "detail_fetched_at IS NULL"
+        if refresh_missing:
+            condition += (" OR (COALESCE(detail_parser_version, 0) < ? AND "
+                          "(year_built IS NULL OR building_type IS NULL OR "
+                          "bathroom IS NULL OR balcony IS NULL))")
+        q = f"SELECT id FROM listings WHERE ({condition})"
         params: list[Any] = []
+        if refresh_missing:
+            params.append(PARSER_VERSION)
         if city:
             q += " AND city=?"
             params.append(city)
         q += " ORDER BY id DESC"
-        if limit:
+        if limit is not None:
             q += " LIMIT ?"
             params.append(limit)
         return [r["id"] for r in self.conn.execute(q, params)]

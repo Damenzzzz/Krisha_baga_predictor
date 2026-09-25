@@ -11,7 +11,7 @@ import httpx
 
 from .. import config
 from ..logging_setup import get_logger
-from .base import Fetcher, FetchResult
+from .base import Fetcher, FetchResult, parse_retry_after
 
 log = get_logger("http")
 
@@ -45,12 +45,7 @@ class HttpEngine(Fetcher):
         try:
             r = self._client.get(url, headers=headers)
             latency = int((time.monotonic() - t0) * 1000)
-            retry_after = None
-            if "Retry-After" in r.headers:
-                try:
-                    retry_after = float(r.headers["Retry-After"])
-                except ValueError:
-                    retry_after = None
+            retry_after = parse_retry_after(r.headers.get("Retry-After"))
             return FetchResult(url, r.status_code, r.text, self.name, latency,
                                retry_after=retry_after)
         except httpx.HTTPError as e:

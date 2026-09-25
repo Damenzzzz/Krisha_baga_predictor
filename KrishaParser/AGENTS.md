@@ -62,8 +62,9 @@ CLAUDE.md                  # `@AGENTS.md`
 - **Idempotent / resumable**: listing `id` is the PK; crawl only refreshes seen
   ids, `details` only fetches rows with `detail_fetched_at IS NULL`, photos only
   download rows without `local_path`, embed only photos with `embedded_at IS NULL`.
-  Re-running never re-does finished work. A raw-response disk cache
-  (`fetcher/cache.py`) is available for list pages.
+  `details --refresh-missing` revisits incomplete rows once per parser version;
+  `--cached-only` reparses saved successful detail HTML without network requests.
+  Photos are merged by URL to preserve existing photo/embedding identities.
 - **Embedding worker** (`embed_worker.py`) is a separate step: open_clip on CPU
   (default `ViT-B-32`) → upsert into Qdrant collection `listing_photos`.
 
@@ -90,6 +91,7 @@ rent_period, price_kzt, duplicate_group_id`.
 ```
 python -m krisha crawl   --city kaskelen|almaty --deal rent [--max-pages N]
 python -m krisha details [--city ...] [--limit N]      # Playwright
+python -m scripts.backfill_details [--limit N]        # refresh + dedup + resync + smoke
 python -m krisha photos  [--limit N]                   # httpx + sha256 dedup
 python -m krisha dedup                                  # assign duplicate_group_id
 python -m krisha embed   [--limit N] [--batch-size N]  # Phase B (needs Qdrant + torch)
@@ -104,14 +106,19 @@ Typical flow: `crawl` → `details` → `photos` → `dedup` → (`embed`) → `
 - Selectors and the `data-name -> column` map live only in `parsers/selectors.py`.
 - Logging via `logging_setup.get_logger(name)`; no secrets in logs.
 
-## Scraping rules — DO NOT CHANGE (hard limits from the brief)
-- **No proxies / no residential rotation. No fingerprint spoofing. Never solve
-  CAPTCHAs.** Realistic User-Agent + polite pace only.
+## Scraping rules (updated by owner, 2026-09-23)
+- Owner authorizes proxies, IP rotation, and VPN for detail backfill. Configure
+  private proxy endpoints via `KRISHA_PROXIES_FILE` (JSON in ignored `data/`).
+  Playwright rotates configured routes after block cooldown within MAX_RETRIES.
+  This machine uses WARP local proxy with opt-in reconnects after 20 requests and
+  on block retries; settings are private in `.env`. See `docs/detail_backfill.md`.
+  Never log credentials. No fingerprint spoofing or CAPTCHA solving.
 - **Max concurrency = 2** (enforced in `config.MAX_CONCURRENCY`; current profile
   runs sequentially = 1, which is polite and stable). Do not raise for speed.
 - Respect robots.txt: never request `/ajax/`, `/captcha`, `/a/show-map/`, `/map/`,
   or any URL with `raion=`.
-- On block/CAPTCHA the correct response is to slow down / stop, not to evade.
+- On block, slow down and honor cooldown before retrying a configured route.
+  Stop on CAPTCHA or exhausted retries; do not loop indefinitely through routes.
 
 ## How to add a new listing field
 1. Add the column to `krisha/db/schema.sql` (nullable) and to
@@ -123,6 +130,13 @@ Typical flow: `crawl` → `details` → `photos` → `dedup` → (`embed`) → `
 4. Add/adjust a fixture assertion in `tests/test_parse_detail.py`.
 
 ## Known limitations / status
+- **2026-09-23 handoff**: background `scripts.auto_backfill` processes batches of 25
+  with photo downloads, new embeddings, dedup, incremental Qdrant sync and latest
+  CSV export. See `data/auto_backfill_status.json` for live counts/PID; logs in
+  `logs/auto_backfill.*.log`. At launch: 3106 detail rows, 6104 first fetches pending,
+  3083 older rows needing refresh; bathroom 19, balcony/loggia 14. The first full
+  resync updated 22,045 points; subsequent audit 0 stale; oblast smoke PASS.
+  Do not report full backfill complete until the live job confirms it.
 - **Detail fetching is IP-reputation limited.** krisha serves 468 on `/a/show/`
   once an IP is flagged; the Playwright engine bypasses it when the IP is clean
   but not when greylisted. Run `details` slowly and patiently; if it stops with
@@ -149,19 +163,21 @@ Typical flow: `crawl` → `details` → `photos` → `dedup` → (`embed`) → `
 - **Phase B validated (against cloud)**: `python -m scripts.smoke_similar --city <c>`
   encodes one photo, searches Qdrant unfiltered + filtered-by-city, and asserts the
   `city` filter leaks nothing (PASS). Confirms the vector index + KEYWORD `city` payload.
-- **Known detail-field gaps** (need a fresh detail page + re-fetch to fix; `/a/show/`
-  is 468-blocked from this network): `year_built` and `building_type` populate on only
-  **1/3084** rows. `live.square`/`map.complex` params parse fine, so `house.year` /
-  `flat.building` are either absent on most live listings or renamed vs the old
-  fixture — diagnose against a live page before touching `PARAM_MAP`. `area_living`
-  (84 rows) is likewise rarely present in the `live.square` string.
+- **Detail-field diagnosis (2026-09-23)**: live pages fetched through Cloudflare
+  WARP local proxy confirm `separated_toilet`, `balcony_count`, `loggia_count` in
+  `.offer__parameters dl` were missed. Parser now reads both summary and definition
+  list layouts, with old aliases retained. `house.year` and `flat.building` still
+  work on a freshly fetched `673910188` (1975, brick); the first 21 new pages omit
+  them entirely. Do not fabricate year/type values for listings without them.
+  See `docs/detail_backfill.md` and ignored `data/detail_diagnostics/` for evidence.
 - **City is canonicalized** to lowercase ASCII keys (`almaty`, `kaskelen`) in
   `parsers/normalize.py::normalize_city`, applied at the DB layer (`upsert_stub` +
   `update_detail`). This fixed a split where crawl stored the CLI arg (`almaty`) and
   detail overwrote it from JSON (`Almaty`), breaking the Qdrant `city` filter. Existing
   DB rows were migrated. **Payload resync**: after any crawl/embed/dedup run
-  `python -m scripts.resync_qdrant_payload` — it patches stale `city` **and**
-  `duplicate_group_id` on points from the DB (dedup runs after embed, so fresh points
+  `python -m scripts.resync_qdrant_payload` — it patches all mutable listing fields,
+  including `city`, `duplicate_group_id`, price, area and coordinates from the DB
+  (dedup runs after embed, so fresh points
   carry a NULL group until resynced). Idempotent. (`scripts/reindex_qdrant_city.py` is
   the older city-only version, superseded by the resync script.)
 - `crawl`, `photos`, `dedup`, `stats`, `export` and all parsing are validated;
@@ -174,14 +190,11 @@ Typical flow: `crawl` → `details` → `photos` → `dedup` → (`embed`) → `
 - [x] Phase B smoke query — **done: `scripts/smoke_similar.py`**, city filter airtight.
 - [x] Move Qdrant to cloud — **done**: `make_client()` + `scripts/migrate_qdrant.py`.
 - [x] Crawl whole Almaty oblast + city — **done: 9210 listings** (`almaty_oblast` path).
-- [ ] Recover `year_built` / `building_type` / `bathroom` / `balcony`: these params
-      populate on ≤1/3084 rows while `live.square`/`map.complex`/`flat.renovation`/
-      `flat.furniture` parse fine — the failing `data-name`s (`house.year`,
-      `flat.building`, `flat.toilet`, `flat.balcony`) look renamed on the live site.
-      Capture a live `/a/show/` detail page from a clean IP, confirm the real
-      `data-name`s, fix `parsers/selectors.py::PARAM_MAP`, then re-run `details` to
-      backfill. NOTE: `/a/show/` is 468-blocked from this network right now
-      (`details` hits 468 immediately) — needs a clean IP.
-- [ ] Backfill remaining detail pages: 6126 listings have `detail_fetched_at IS NULL`
-      (no lat/lon, kitchen area, etc.). Idempotent — resume `details` once IP is clean.
+- [x] Diagnose missing fields against live pages and fix definition-list parsing
+      plus confirmed current aliases; add regression tests. Year/type use existing
+      correct selectors and remain nullable when the source does not provide them.
+- [ ] Finish `details --refresh-missing` for the full dataset (resumable by parser
+      version), followed by dedup / full payload resync / oblast smoke test.
+- [ ] Backfill remaining detail pages: 6104 pending at the 2026-09-23 handoff;
+      consult `data/auto_backfill_status.json` for the current queue. Idempotent.
 - [ ] Optional: parse `complexId -> complex_name` via the complexes endpoint.

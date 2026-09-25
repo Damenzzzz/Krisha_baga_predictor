@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS listings (
     photos_count       INTEGER,
     raw_json           TEXT,                       -- json blob of window.data.advert
     detail_fetched_at  TEXT,                       -- set once card is enriched
+    detail_parser_version INTEGER,
     first_seen_at      TEXT,
     last_seen_at       TEXT,
     duplicate_group_id TEXT

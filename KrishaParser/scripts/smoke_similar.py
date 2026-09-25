@@ -77,6 +77,9 @@ def main() -> int:
         city_filter = Filter(must=[FieldCondition(key="city",
                                                   match=MatchValue(value=q_city))])
         hits = show(f"[2] FILTERED city={q_city!r} top-{args.topk}:", city_filter)
+        if not hits:
+            print("FAIL: filtered search returned no results")
+            return 1
         bad = [h for h in hits if (h.payload or {}).get("city") != q_city]
         if bad:
             print(f"FAIL: {len(bad)} results leaked outside city={q_city!r}")

@@ -2,7 +2,7 @@
 
 All tunables come from environment (.env) with safe defaults. The politeness
 limits here are HARD RULES from the project brief and must not be relaxed for
-speed: max concurrency 2, realistic UA, no proxies, no captcha solving.
+speed: max concurrency 2, realistic UA, no captcha solving.
 """
 from __future__ import annotations
 

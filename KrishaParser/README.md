@@ -40,9 +40,25 @@ python -m krisha embed --limit 500              # open_clip (ViT-B-32, CPU) -> Q
 python -m pytest -q                             # parses real saved fixtures
 ```
 
-## Rules (do not change)
-No proxies, no fingerprint spoofing, never solve CAPTCHAs, max concurrency 2,
-respect robots.txt. On a block the parser slows down / stops — it does not evade.
+## Detail backfill
+
+For unattended batches with automatic photo embedding, Qdrant updates and a live
+CSV export: `python -m scripts.auto_backfill --batch-size 25`. Optional
+`--fallback-proxies data/public-proxies-ranked.json` adds validated proxy candidates.
+Progress is in `data/auto_backfill_status.json`; the CSV is
+`data/exports/listings_latest.csv`. CAPTCHA and exhausted routes stop the worker.
+
+`python -m scripts.backfill_details` refreshes missing detail fields, then runs
+dedup, full Qdrant payload resync and an `almaty_oblast` smoke test. Partial
+progress is finalized even after a controlled block stop. Successful detail HTML
+is cached; `python -m krisha details --cached-only --refresh-missing` reparses it
+offline. See [connection setup and field diagnosis](docs/detail_backfill.md).
+
+## Rules
+Owner-authorized proxies / VPN are supported via `KRISHA_PROXIES_FILE`.
+No fingerprint spoofing, never solve CAPTCHAs, max concurrency 2,
+respect robots.txt. On a block the parser slows down and rotates configured routes
+within bounded retries; CAPTCHA always stops the run.
 See AGENTS.md → "Scraping rules".
 
 ## Notes

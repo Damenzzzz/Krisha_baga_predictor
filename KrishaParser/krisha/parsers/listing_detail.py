@@ -14,10 +14,11 @@ from typing import Any
 
 from . import dom, normalize as N
 from .selectors import (DESCRIPTION, INFO_ITEM, INFO_TITLE, INFO_VALUE, PARAM_MAP,
-                        TITLE_H1)
+                        PARAMETER_ROW, PARAMETER_NAME, PARAMETER_VALUE, TITLE_H1)
 from .window_data import extract_window_data
 
 _CREATED_RE = re.compile(r'"createdAt"\s*:\s*"([^"]+)"')
+PARSER_VERSION = 3
 
 
 @dataclass
@@ -25,6 +26,30 @@ class DetailResult:
     fields: dict[str, Any] = field(default_factory=dict)
     photos: list[dict[str, Any]] = field(default_factory=list)
     parsed: bool = False  # True if we recognized the page structure
+
+
+def extract_characteristics(html: str) -> list[dict[str, Any]]:
+    """Read both the summary cards and the description's definition lists."""
+    return _characteristics(dom.parse(html))
+
+
+def _characteristics(tree) -> list[dict[str, Any]]:
+    rows = []
+    for selector, name_selector, value_selector in (
+        (INFO_ITEM, None, INFO_VALUE),
+        (PARAMETER_ROW, PARAMETER_NAME, PARAMETER_VALUE),
+    ):
+        for item in tree.css(selector):
+            name_node = item.css_first(name_selector) if name_selector else item
+            if name_node is None:
+                continue
+            name = name_node.attr("data-name")
+            title = name_node if name_selector else item.css_first(INFO_TITLE)
+            values = [N.clean(v.text()) for v in item.css(value_selector)]
+            rows.append({"data-name": name, "title": title.text() if title else None,
+                         "value": ", ".join(v for v in values if v) or None,
+                         "column": PARAM_MAP.get(name), "source": selector})
+    return rows
 
 
 def parse_detail(html: str, url: str | None = None) -> DetailResult:
@@ -72,12 +97,11 @@ def parse_detail(html: str, url: str | None = None) -> DetailResult:
 
     # Characteristics from offer__info-item blocks
     reno_parts: list[str] = []
-    for item in tree.css(INFO_ITEM):
-        name = item.attr("data-name") or ""
-        col = PARAM_MAP.get(name)
-        vnode = item.css_first(INFO_VALUE)
-        value = N.clean(vnode.text()) if vnode else None
-        if not value and not name:
+    balcony_parts: list[str] = []
+    for characteristic in _characteristics(tree):
+        col = characteristic["column"]
+        value = characteristic["value"]
+        if not value:
             continue
         if col in (None, "_ignore"):
             continue
@@ -101,6 +125,10 @@ def parse_detail(html: str, url: str | None = None) -> DetailResult:
         elif col == "year_built":
             f[col] = N.to_int(value)
             res.parsed = True
+        elif col in ("_balcony_count", "_loggia_count"):
+            label = "балкон" if col == "_balcony_count" else "лоджия"
+            balcony_parts.append(f"{label}: {value}")
+            res.parsed = True
         else:
             f[col] = value
             res.parsed = True
@@ -111,6 +139,8 @@ def parse_detail(html: str, url: str | None = None) -> DetailResult:
         f["floors_total"] = floors_total
     if reno_parts:
         f["renovation_text"] = " — ".join(reno_parts)
+    if balcony_parts:
+        f["balcony"] = "; ".join(balcony_parts)
 
     # Description
     desc = tree.css_first(DESCRIPTION)
